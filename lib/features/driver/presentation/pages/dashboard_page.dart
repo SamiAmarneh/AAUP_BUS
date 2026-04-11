@@ -1,0 +1,266 @@
+import 'package:flutter/material.dart';
+import 'scanner_page.dart';
+
+class DriverDashboardPage extends StatelessWidget {
+  const DriverDashboardPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FB),
+      body: Column(
+        children: [
+          // Header Section
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.only(top: 60, left: 25, right: 25, bottom: 30),
+            decoration: const BoxDecoration(
+              color: Color(0xFF4CAF50), // اللون الأخضر الخاص بالسائق
+              borderRadius: BorderRadius.only(
+                bottomLeft: Radius.circular(30),
+                bottomRight: Radius.circular(30),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Welcome back,',
+                          style: TextStyle(color: Colors.white70, fontSize: 16),
+                        ),
+                        Text(
+                          'Driver Ahmed',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: IconButton(
+                        icon: const Icon(Icons.logout, color: Colors.white),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    )
+                  ],
+                ),
+                const SizedBox(height: 30),
+                // Current Trip Quick View
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Current Trip', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                          SizedBox(height: 5),
+                          Text('Jenin → AAUP', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text('Bus ID', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                          SizedBox(height: 5),
+                          Text('BUS-001', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Main Content
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.all(25),
+              children: [
+                const Text(
+                  'Main Actions',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1A1C1E)),
+                ),
+                const SizedBox(height: 20),
+                
+                // Scan QR Button (The Most Important Action)
+                _buildLargeActionCard(
+                  context,
+                  'Scan Student QR',
+                  'Verify student check-in for this trip',
+                  Icons.qr_code_scanner,
+                  const Color(0xFFE8F5E9),
+                  const Color(0xFF4CAF50),
+                  () {
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => const DriverScannerPage()));
+                  },
+                ),
+                
+                const SizedBox(height: 20),
+                
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildSmallStatCard(
+                        'Total Passengers',
+                        '32/45',
+                        Icons.people,
+                        Colors.blue,
+                      ),
+                    ),
+                    const SizedBox(width: 15),
+                    Expanded(
+                      child: _buildSmallStatCard(
+                        'Trip Status',
+                        'On the Way',
+                        Icons.trending_up,
+                        Colors.orange,
+                      ),
+                    ),
+                  ],
+                ),
+                
+                const SizedBox(height: 30),
+                const Text(
+                  'Assigned Schedule',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1A1C1E)),
+                ),
+                const SizedBox(height: 15),
+                
+                _buildTripScheduleItem('Morning Trip', '07:00 AM', 'Jenin', 'AAUP', true),
+                _buildTripScheduleItem('Return Trip', '03:30 PM', 'AAUP', 'Jenin', false),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLargeActionCard(
+    BuildContext context,
+    String title,
+    String subtitle,
+    IconData icon,
+    Color bgColor,
+    Color iconColor,
+    VoidCallback onTap,
+  ) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(25),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(25),
+          border: Border.all(color: iconColor.withOpacity(0.1)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(15),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Icon(icon, color: iconColor, size: 30),
+            ),
+            const SizedBox(width: 20),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: iconColor),
+                  ),
+                  Text(
+                    subtitle,
+                    style: TextStyle(fontSize: 14, color: iconColor.withOpacity(0.7)),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.arrow_forward_ios, color: iconColor, size: 18),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSmallStatCard(String title, String value, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 24),
+          const SizedBox(height: 15),
+          Text(title, style: const TextStyle(color: Colors.blueGrey, fontSize: 12)),
+          const SizedBox(height: 5),
+          Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTripScheduleItem(String name, String time, String from, String to, bool isActive) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 15),
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(15),
+        border: isActive ? Border.all(color: const Color(0xFF4CAF50), width: 1) : null,
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: isActive ? const Color(0xFFE8F5E9) : const Color(0xFFF5F5F5),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(Icons.access_time, color: isActive ? const Color(0xFF4CAF50) : Colors.grey),
+          ),
+          const SizedBox(width: 15),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text('$from → $to', style: const TextStyle(color: Colors.blueGrey, fontSize: 13)),
+              ],
+            ),
+          ),
+          Text(time, style: const TextStyle(fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+}
