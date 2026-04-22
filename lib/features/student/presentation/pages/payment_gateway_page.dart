@@ -151,17 +151,36 @@ class PaymentGatewayPage extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  ApplePayButton(
-                    paymentConfigurationAsset: 'assets/apple_pay_profile.json',
-                    paymentItems: _paymentItems,
-                    style: ApplePayButtonStyle.black,
-                    type: ApplePayButtonType.buy,
-                    margin: const EdgeInsets.only(top: 8),
-                    onPaymentResult: (result) =>
-                        _onApplePayResult(context, result),
-                    loadingIndicator: const Center(
-                      child: CircularProgressIndicator(),
+                  FutureBuilder<PaymentConfiguration>(
+                    future: PaymentConfiguration.fromAsset(
+                      'apple_pay_profile.json',
                     ),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState != ConnectionState.done) {
+                        return const Center(
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(vertical: 16),
+                            child: CircularProgressIndicator(),
+                          ),
+                        );
+                      }
+                      final config = snapshot.data;
+                      if (config == null) {
+                        return const SizedBox.shrink();
+                      }
+                      return ApplePayButton(
+                        paymentConfiguration: config,
+                        paymentItems: _paymentItems,
+                        style: ApplePayButtonStyle.black,
+                        type: ApplePayButtonType.buy,
+                        margin: const EdgeInsets.only(top: 8),
+                        onPaymentResult: (result) =>
+                            _onApplePayResult(context, result),
+                        loadingIndicator: const Center(
+                          child: CircularProgressIndicator(),
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),
