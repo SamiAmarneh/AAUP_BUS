@@ -31,3 +31,17 @@ final currentUserProfileProvider = FutureProvider<AppUser?>((ref) async {
   }
   return ref.read(authRepositoryProvider).fetchCurrentProfile();
 });
+
+/// Loads profile from `admins/{uid}` only (same source as driver uses `drivers/{uid}`).
+final adminProfileProvider = FutureProvider<AppUser?>((ref) async {
+  ref.watch(signInSessionTickProvider);
+  final repository = ref.read(authRepositoryProvider);
+  if (repository.isSignInInProgress) {
+    return null;
+  }
+  final user = await ref.watch(authStateProvider.future);
+  if (user == null) {
+    return null;
+  }
+  return repository.fetchAdminProfile();
+});

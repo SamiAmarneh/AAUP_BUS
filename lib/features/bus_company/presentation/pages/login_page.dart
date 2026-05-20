@@ -38,6 +38,7 @@ class _BusCompanyLoginPageState extends ConsumerState<BusCompanyLoginPage> {
             expectedRole: UserRole.admin,
           );
       ref.invalidate(currentUserProfileProvider);
+      ref.invalidate(adminProfileProvider);
       if (!mounted) {
         return;
       }

@@ -10,7 +10,7 @@ The app uses **Firebase Authentication** (email/password) plus Firestore profile
 
 | Collection | Document ID | Fields |
 |------------|-------------|--------|
-| `admins` | Firebase Auth UID | `email` |
+| `admins` | Firebase Auth UID | `email`, `name` |
 | `drivers` | Firebase Auth UID | `email`, `name` |
 
 ### One-time Admin migration
@@ -19,7 +19,7 @@ If your `admins` document uses a random ID (not the Auth UID):
 
 1. In Firebase Console → **Authentication**, create or locate the admin user (e.g. `luna12@gmail.com`).
 2. Copy the user **UID**.
-3. In **Firestore**, create `admins/{uid}` with `{ "email": "luna12@gmail.com" }`.
+3. In **Firestore**, create `admins/{uid}` with `{ "email": "luna12@gmail.com", "name": "Your Name" }` (add `name` to **admins**, not only **drivers**).
 4. Delete the old admin document and remove any `password` field.
 5. Deploy security rules: `firebase deploy --only firestore:rules`
 

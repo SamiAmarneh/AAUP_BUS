@@ -13,7 +13,12 @@ class AppUser {
   final String email;
   final String? name;
 
-  String get displayName => name ?? email;
+  String get displayName {
+    final resolvedName = name?.trim();
+    return resolvedName != null && resolvedName.isNotEmpty
+        ? resolvedName
+        : email;
+  }
 
   factory AppUser.fromAdminDoc({
     required String uid,
@@ -22,7 +27,8 @@ class AppUser {
     return AppUser(
       uid: uid,
       role: UserRole.admin,
-      email: data['email'] as String? ?? '',
+      email: _readEmail(data),
+      name: _readName(data),
     );
   }
 
@@ -33,8 +39,22 @@ class AppUser {
     return AppUser(
       uid: uid,
       role: UserRole.driver,
-      email: data['email'] as String? ?? '',
-      name: data['name'] as String?,
+      email: _readEmail(data),
+      name: _readName(data),
     );
+  }
+
+  static String _readEmail(Map<String, dynamic> data) {
+    final email = data['email'];
+    return email is String ? email.trim() : '';
+  }
+
+  static String? _readName(Map<String, dynamic> data) {
+    final value = data['name'];
+    if (value == null) {
+      return null;
+    }
+    final trimmed = value.toString().trim();
+    return trimmed.isEmpty ? null : trimmed;
   }
 }

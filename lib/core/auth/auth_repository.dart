@@ -92,6 +92,22 @@ class AuthRepository {
     }
   }
 
+  Future<AppUser?> fetchAdminProfile() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) {
+      return null;
+    }
+    final adminSnapshot = await _getProfileDoc(
+      collection: FirestoreCollections.admin,
+      uid: uid,
+      fromServer: true,
+    );
+    if (!adminSnapshot.exists) {
+      return null;
+    }
+    return AppUser.fromAdminDoc(uid: uid, data: adminSnapshot.data() ?? {});
+  }
+
   Future<AppUser?> fetchCurrentProfile() async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) {
@@ -101,28 +117,35 @@ class AuthRepository {
     final adminSnapshot = await _getProfileDoc(
       collection: FirestoreCollections.admin,
       uid: uid,
+      fromServer: true,
     );
     final driverSnapshot = await _getProfileDoc(
       collection: FirestoreCollections.drivers,
       uid: uid,
+      fromServer: true,
     );
     final hasAdmin = adminSnapshot.exists;
     final hasDriver = driverSnapshot.exists;
 
-    final AppUser? profile;
-    if (signedInRole != null) {
-      profile = await _resolveProfileForRole(uid, signedInRole);
-    } else {
-      profile = _resolveProfileWhenRoleUnknown(
+    return switch (signedInRole) {
+      UserRole.admin when hasAdmin => AppUser.fromAdminDoc(
+        uid: uid,
+        data: adminSnapshot.data() ?? {},
+      ),
+      UserRole.admin => _resolveAdminSignInProfile(uid),
+      UserRole.driver when hasDriver => AppUser.fromDriverDoc(
+        uid: uid,
+        data: driverSnapshot.data() ?? {},
+      ),
+      UserRole.driver => _resolveDriverSignInProfile(uid),
+      null => _resolveProfileWhenRoleUnknown(
         uid: uid,
         hasAdmin: hasAdmin,
         hasDriver: hasDriver,
         adminSnapshot: adminSnapshot,
         driverSnapshot: driverSnapshot,
-      );
-    }
-
-    return profile;
+      ),
+    };
   }
 
   AppUser? _resolveProfileWhenRoleUnknown({
@@ -158,6 +181,7 @@ class AuthRepository {
     final adminSnapshot = await _getProfileDoc(
       collection: FirestoreCollections.admin,
       uid: uid,
+      fromServer: true,
     );
     if (adminSnapshot.exists) {
       return AppUser.fromAdminDoc(uid: uid, data: adminSnapshot.data() ?? {});
@@ -195,8 +219,12 @@ class AuthRepository {
   Future<DocumentSnapshot<Map<String, dynamic>>> _getProfileDoc({
     required String collection,
     required String uid,
+    bool fromServer = false,
   }) {
-    return _firestore.collection(collection).doc(uid).get();
+    final docRef = _firestore.collection(collection).doc(uid);
+    return fromServer
+        ? docRef.get(const GetOptions(source: Source.server))
+        : docRef.get();
   }
 
   Future<void> _clearGuestStudentSession() async {

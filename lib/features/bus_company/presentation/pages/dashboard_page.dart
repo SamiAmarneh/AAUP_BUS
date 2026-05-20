@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/auth/auth_actions.dart';
 import '../../../../core/auth/auth_providers.dart';
-import '../../../../core/auth/user_role.dart';
 import 'trips_management_page.dart';
 import 'bus_management_page.dart';
 import 'trip_tracking_page.dart';
@@ -15,9 +14,9 @@ class AdminDashboardPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final profileAsync = ref.watch(currentUserProfileProvider);
+    final adminProfileAsync = ref.watch(adminProfileProvider);
 
-    return profileAsync.when(
+    return adminProfileAsync.when(
       loading: () => const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       ),
@@ -25,20 +24,12 @@ class AdminDashboardPage extends ConsumerWidget {
         body: Center(child: CircularProgressIndicator()),
       ),
       data: (profile) {
-        if (profileAsync.isRefreshing) {
+        if (adminProfileAsync.isRefreshing) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
         }
         if (profile == null) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
-        }
-        if (profile.role != UserRole.admin) {
-          WidgetsBinding.instance.addPostFrameCallback((_) async {
-            await ref.read(authRepositoryProvider).signOut();
-          });
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
@@ -62,14 +53,24 @@ class AdminDashboardPage extends ConsumerWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'Admin Dashboard',
-                              style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold),
+                              'Welcome back,',
+                              style: TextStyle(color: Colors.white70, fontSize: 16),
                             ),
-                            const SizedBox(height: 4),
                             Text(
-                              profile.email,
-                              style: const TextStyle(color: Colors.white70, fontSize: 14),
+                              profile.name ?? profile.email,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
+                            if (profile.name != null) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                profile.email,
+                                style: const TextStyle(color: Colors.white70, fontSize: 14),
+                              ),
+                            ],
                           ],
                         ),
                         IconButton(

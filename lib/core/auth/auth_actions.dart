@@ -20,6 +20,7 @@ Future<void> performLogout(BuildContext context, WidgetRef ref) async {
   await ref.read(authRepositoryProvider).signOut();
   await clearGuestStudentSession(ref);
   ref.invalidate(currentUserProfileProvider);
+  ref.invalidate(adminProfileProvider);
   if (context.mounted) {
     Navigator.of(context).popUntil((route) => route.isFirst);
   }
