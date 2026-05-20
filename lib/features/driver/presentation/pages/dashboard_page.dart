@@ -42,7 +42,7 @@ class DriverDashboardPage extends ConsumerWidget {
 
         return _DriverDashboardBody(
           driverName: profile.displayName,
-          onLogout: () => performLogout(context, ref),
+          onLogout: () => confirmLogout(context, ref),
         );
       },
     );

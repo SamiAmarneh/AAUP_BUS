@@ -74,7 +74,7 @@ class AdminDashboardPage extends ConsumerWidget {
                         ),
                         IconButton(
                           icon: const Icon(Icons.logout, color: Colors.white, size: 28),
-                          onPressed: () => performLogout(context, ref),
+                          onPressed: () => confirmLogout(context, ref),
                         ),
                       ],
                     ),
