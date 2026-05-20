@@ -1,12 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../../core/session/session_providers.dart';
 import 'browse_trips_page.dart';
 import 'live_tracking_page.dart';
 
-class StudentLoginPage extends StatelessWidget {
-  const StudentLoginPage({super.key});
+class StudentLoginPage extends ConsumerWidget {
+  const StudentLoginPage({
+    super.key,
+    this.isSessionRoot = false,
+  });
+
+  final bool isSessionRoot;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       backgroundColor: const Color(0xFFF7FCFF),
       body: SafeArea(
@@ -18,29 +26,39 @@ class StudentLoginPage extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.start,
                 children: [
-                  InkWell(
-                    onTap: () => Navigator.pop(context),
-                    borderRadius: BorderRadius.circular(14),
-                    child: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
+                  if (isSessionRoot)
+                    TextButton.icon(
+                      onPressed: () => _switchRole(context, ref),
+                      icon: const Icon(Icons.swap_horiz, size: 18, color: Color(0xFF3B4B5A)),
+                      label: const Text(
+                        'Switch role',
+                        style: TextStyle(color: Color(0xFF3B4B5A), fontWeight: FontWeight.w600),
                       ),
-                      child: const Icon(
-                        Icons.arrow_back_ios,
-                        size: 18,
-                        color: Color(0xFF3B4B5A),
+                    )
+                  else
+                    InkWell(
+                      onTap: () => Navigator.pop(context),
+                      borderRadius: BorderRadius.circular(14),
+                      child: Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.arrow_back_ios,
+                          size: 18,
+                          color: Color(0xFF3B4B5A),
+                        ),
                       ),
                     ),
-                  ),
                 ],
               ),
               const SizedBox(height: 24),
@@ -151,6 +169,14 @@ class StudentLoginPage extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _switchRole(BuildContext context, WidgetRef ref) async {
+    await clearGuestStudentSession(ref);
+    if (!context.mounted) {
+      return;
+    }
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   Widget _buildActionCard(

@@ -1,8 +1,62 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../../core/auth/auth_actions.dart';
+import '../../../../core/auth/auth_providers.dart';
+import '../../../../core/auth/user_role.dart';
 import 'scanner_page.dart';
 
-class DriverDashboardPage extends StatelessWidget {
+class DriverDashboardPage extends ConsumerWidget {
   const DriverDashboardPage({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profileAsync = ref.watch(currentUserProfileProvider);
+
+    return profileAsync.when(
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      ),
+      error: (_, __) => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      ),
+      data: (profile) {
+        if (profileAsync.isRefreshing) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        if (profile == null) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        if (profile.role != UserRole.driver) {
+          WidgetsBinding.instance.addPostFrameCallback((_) async {
+            await ref.read(authRepositoryProvider).signOut();
+          });
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        return _DriverDashboardBody(
+          driverName: profile.displayName,
+          onLogout: () => performLogout(context, ref),
+        );
+      },
+    );
+  }
+}
+
+class _DriverDashboardBody extends StatelessWidget {
+  const _DriverDashboardBody({
+    required this.driverName,
+    required this.onLogout,
+  });
+
+  final String driverName;
+  final VoidCallback onLogout;
 
   @override
   Widget build(BuildContext context) {
@@ -27,16 +81,16 @@ class DriverDashboardPage extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Column(
+                    Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
+                        const Text(
                           'Welcome back,',
                           style: TextStyle(color: Colors.white70, fontSize: 16),
                         ),
                         Text(
-                          'Driver Ahmed',
-                          style: TextStyle(
+                          driverName,
+                          style: const TextStyle(
                             color: Colors.white,
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
@@ -51,7 +105,7 @@ class DriverDashboardPage extends StatelessWidget {
                       ),
                       child: IconButton(
                         icon: const Icon(Icons.logout, color: Colors.white),
-                        onPressed: () => Navigator.pop(context),
+                        onPressed: onLogout,
                       ),
                     )
                   ],

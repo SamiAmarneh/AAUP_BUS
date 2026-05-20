@@ -1,8 +1,81 @@
 import 'package:flutter/material.dart';
-import 'dashboard_page.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class BusCompanyLoginPage extends StatelessWidget {
+import '../../../../core/auth/auth_exceptions.dart';
+import '../../../../core/auth/auth_providers.dart';
+import '../../../../core/auth/user_role.dart';
+
+class BusCompanyLoginPage extends ConsumerStatefulWidget {
   const BusCompanyLoginPage({super.key});
+
+  @override
+  ConsumerState<BusCompanyLoginPage> createState() => _BusCompanyLoginPageState();
+}
+
+class _BusCompanyLoginPageState extends ConsumerState<BusCompanyLoginPage> {
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _isLoading = false;
+  String? _errorMessage;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleLogin() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      await ref.read(authRepositoryProvider).signIn(
+            email: _emailController.text,
+            password: _passwordController.text,
+            expectedRole: UserRole.admin,
+          );
+      ref.invalidate(currentUserProfileProvider);
+      if (!mounted) {
+        return;
+      }
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } on AuthFailure catch (failure) {
+      if (mounted) {
+        setState(() => _errorMessage = failure.message);
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _errorMessage = 'Login failed. Please try again.');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _handleForgotPassword() async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty) {
+      setState(() => _errorMessage = 'Enter your email to reset your password.');
+      return;
+    }
+
+    try {
+      await ref.read(authRepositoryProvider).sendPasswordResetEmail(email);
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Password reset email sent.')),
+      );
+    } on AuthFailure catch (failure) {
+      setState(() => _errorMessage = failure.message);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -13,7 +86,7 @@ class BusCompanyLoginPage extends StatelessWidget {
         elevation: 0,
         leadingWidth: 100,
         leading: TextButton.icon(
-          onPressed: () => Navigator.pop(context),
+          onPressed: _isLoading ? null : () => Navigator.pop(context),
           icon: const Icon(Icons.arrow_back_ios, color: Color(0xFF5E6E7C), size: 16),
           label: const Text('Back', style: TextStyle(color: Color(0xFF5E6E7C), fontSize: 16)),
         ),
@@ -45,26 +118,55 @@ class BusCompanyLoginPage extends StatelessWidget {
               style: TextStyle(color: Color(0xFF5E6E7C), fontSize: 15),
             ),
             const SizedBox(height: 45),
-            _buildTextField(label: 'Email', hint: 'admin@aaup.edu'),
+            _buildTextField(
+              label: 'Email',
+              hint: 'admin@aaup.edu',
+              controller: _emailController,
+            ),
             const SizedBox(height: 20),
-            _buildTextField(label: 'Password', hint: '........', isPassword: true),
-            const SizedBox(height: 45),
+            _buildTextField(
+              label: 'Password',
+              hint: '........',
+              controller: _passwordController,
+              isPassword: true,
+            ),
+            if (_errorMessage != null) ...[
+              const SizedBox(height: 16),
+              Text(
+                _errorMessage!,
+                style: const TextStyle(color: Colors.red, fontSize: 14),
+                textAlign: TextAlign.center,
+              ),
+            ],
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: _isLoading ? null : _handleForgotPassword,
+                child: const Text('Forgot password?'),
+              ),
+            ),
+            const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
               height: 58,
               child: ElevatedButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const AdminDashboardPage()),
-                  );
-                },
+                onPressed: _isLoading ? null : _handleLogin,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF247BFF),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                   elevation: 0,
                 ),
-                child: const Text('Login', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                child: _isLoading
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text(
+                        'Login',
+                        style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
               ),
             ),
           ],
@@ -73,14 +175,21 @@ class BusCompanyLoginPage extends StatelessWidget {
     );
   }
 
-  Widget _buildTextField({required String label, required String hint, bool isPassword = false}) {
+  Widget _buildTextField({
+    required String label,
+    required String hint,
+    required TextEditingController controller,
+    bool isPassword = false,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label, style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1A1C1E), fontSize: 15)),
         const SizedBox(height: 10),
         TextField(
+          controller: controller,
           obscureText: isPassword,
+          keyboardType: isPassword ? TextInputType.text : TextInputType.emailAddress,
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: const TextStyle(color: Colors.grey),

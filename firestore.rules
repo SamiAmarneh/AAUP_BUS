@@ -1,0 +1,43 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAdmin() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function isDriver() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/drivers/$(request.auth.uid));
+    }
+
+    match /admins/{adminId} {
+      allow read: if request.auth != null && request.auth.uid == adminId;
+      allow write: if isAdmin();
+    }
+
+    match /drivers/{driverId} {
+      allow read: if request.auth != null
+        && (request.auth.uid == driverId || isAdmin());
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /buses/{id} {
+      allow read, write: if isAdmin();
+    }
+
+    match /Trips/{id} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+
+    match /Reservation/{id} {
+      allow read, write: if false;
+    }
+
+    match /Payment/{id} {
+      allow read, write: if false;
+    }
+  }
+}
