@@ -5,7 +5,6 @@ import '../../features/bus_company/presentation/pages/dashboard_page.dart';
 import '../../features/driver/presentation/pages/dashboard_page.dart';
 import '../../features/home/presentation/pages/home_page.dart';
 import '../../features/student/presentation/pages/login_page.dart';
-import '../debug/agent_log.dart';
 import '../session/session_providers.dart';
 import 'auth_providers.dart';
 import 'user_role.dart';
@@ -69,12 +68,6 @@ class _AuthenticatedHome extends ConsumerWidget {
           );
         }
 
-        AgentLog.write(
-          location: 'auth_gate.dart:_AuthenticatedHome',
-          message: 'routing dashboard by profile role',
-          hypothesisId: 'H3',
-          data: {'resolvedRole': profile.role.name, 'uid': profile.uid},
-        );
         return switch (profile.role) {
           UserRole.admin => const AdminDashboardPage(),
           UserRole.driver => const DriverDashboardPage(),

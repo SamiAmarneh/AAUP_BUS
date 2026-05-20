@@ -2,7 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../debug/agent_log.dart';
 import '../session/app_session_repository.dart';
 import 'app_user.dart';
 import 'auth_exceptions.dart';
@@ -51,13 +50,6 @@ class AuthRepository {
 
       // Persist before profile fetch so auth-state listeners route correctly.
       await _persistSignedInRole(expectedRole);
-      AgentLog.write(
-        location: 'auth_repository.dart:signIn',
-        message: 'early persist expectedRole',
-        hypothesisId: 'H2',
-        runId: 'post-fix-role',
-        data: {'uid': uid, 'expectedRole': expectedRole.name},
-      );
 
       AppUser profile;
       try {
@@ -74,28 +66,10 @@ class AuthRepository {
       } on FirebaseException catch (exception) {
         await _clearSignedInRole();
         await _auth.signOut();
-        AgentLog.write(
-          location: 'auth_repository.dart:signIn',
-          message: 'signIn firestore error',
-          hypothesisId: 'H8',
-          runId: 'admin-login-fix',
-          data: {'code': exception.code, 'expectedRole': expectedRole.name},
-        );
         throw mapFirestoreException(exception);
       }
 
       await _clearGuestStudentSession();
-      AgentLog.write(
-        location: 'auth_repository.dart:signIn',
-        message: 'signIn completed',
-        hypothesisId: 'H2',
-        runId: 'post-fix-role',
-        data: {
-          'uid': uid,
-          'expectedRole': expectedRole.name,
-          'resolvedRole': profile.role.name,
-        },
-      );
       return profile;
     } on FirebaseAuthException catch (exception) {
       throw mapFirebaseAuthException(exception);
@@ -148,18 +122,6 @@ class AuthRepository {
       );
     }
 
-    AgentLog.write(
-      location: 'auth_repository.dart:fetchCurrentProfile',
-      message: 'session profile resolved',
-      hypothesisId: 'H1',
-      data: {
-        'uid': uid,
-        'signedInRole': signedInRole?.name,
-        'hasAdminDoc': hasAdmin,
-        'hasDriverDoc': hasDriver,
-        'resolvedRole': profile?.role.name,
-      },
-    );
     return profile;
   }
 
@@ -171,11 +133,6 @@ class AuthRepository {
     required DocumentSnapshot<Map<String, dynamic>> driverSnapshot,
   }) {
     if (hasAdmin && hasDriver) {
-      AgentLog.write(
-        location: 'auth_repository.dart:_resolveProfileWhenRoleUnknown',
-        message: 'ambiguous dual-role docs without signedInRole',
-        hypothesisId: 'H1',
-      );
       return null;
     }
     if (hasAdmin) {
@@ -238,19 +195,8 @@ class AuthRepository {
   Future<DocumentSnapshot<Map<String, dynamic>>> _getProfileDoc({
     required String collection,
     required String uid,
-  }) async {
-    try {
-      return _firestore.collection(collection).doc(uid).get();
-    } on FirebaseException catch (exception) {
-      AgentLog.write(
-        location: 'auth_repository.dart:_getProfileDoc',
-        message: 'profile doc read failed',
-        hypothesisId: 'H8',
-        runId: 'admin-login-fix',
-        data: {'collection': collection, 'code': exception.code},
-      );
-      rethrow;
-    }
+  }) {
+    return _firestore.collection(collection).doc(uid).get();
   }
 
   Future<void> _clearGuestStudentSession() async {
