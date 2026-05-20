@@ -1,16 +1,46 @@
-# pro2
+# GoAAUP
 
-A new Flutter project.
+Bus tracking and reservation app for AAUP.
 
-## Getting Started
+## Firebase authentication (Admin + Driver)
 
-This project is a starting point for a Flutter application.
+The app uses **Firebase Authentication** (email/password) plus Firestore profile documents. Passwords are **never** stored or read from Firestore.
 
-A few resources to get you started if this is your first Flutter project:
+### Firestore collections (case-sensitive)
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+| Collection | Document ID | Fields |
+|------------|-------------|--------|
+| `admins` | Firebase Auth UID | `email` |
+| `drivers` | Firebase Auth UID | `email`, `name` |
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+### One-time Admin migration
+
+If your `admins` document uses a random ID (not the Auth UID):
+
+1. In Firebase Console → **Authentication**, create or locate the admin user (e.g. `luna12@gmail.com`).
+2. Copy the user **UID**.
+3. In **Firestore**, create `admins/{uid}` with `{ "email": "luna12@gmail.com" }`.
+4. Delete the old admin document and remove any `password` field.
+5. Deploy security rules: `firebase deploy --only firestore:rules`
+
+### Driver accounts
+
+Ensure a matching **Authentication** user exists and `drivers/{authUid}` contains `email` and `name`.
+
+### Admin cannot log in?
+
+1. Confirm the Firestore collection is **`admins`** (matches your Firebase data).
+2. Create **`admins/{firebaseAuthUid}`** with `{ "email": "your@email.com" }` (UID from Authentication tab).
+3. Deploy rules: `firebase deploy --only firestore:rules`
+4. If you only have a `drivers/{uid}` document, use **Driver Login** until an `admins/{uid}` profile exists.
+
+### Students
+
+Students use the app as **guests** (no login) in this phase.
+
+## Getting started
+
+```bash
+flutter pub get
+flutter run
+```

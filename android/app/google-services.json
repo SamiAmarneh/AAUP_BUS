@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "898847540096",
+    "project_id": "aaup-bus-tracking",
+    "storage_bucket": "aaup-bus-tracking.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:898847540096:android:e017f15c3fe122571b3765",
+        "android_client_info": {
+          "package_name": "com.aaup.bus"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCzrlynYB2Fu--tP_zWpamiLfIQeWaLD1s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

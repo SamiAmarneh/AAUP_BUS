@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../../core/auth/auth_route_guard.dart';
 import '../../../bus_company/presentation/pages/login_page.dart';
 import '../../../driver/presentation/pages/login_page.dart';
 import '../../../student/presentation/pages/login_page.dart';
+import '../../../../core/session/session_providers.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends ConsumerWidget {
   const HomePage({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FCFD),
       body: SafeArea(
@@ -16,7 +20,6 @@ class HomePage extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Top Icon
               Center(
                 child: Container(
                   width: 100,
@@ -33,9 +36,8 @@ class HomePage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 30),
-              // App Name
               const Text(
-                'AAUP Bus System',
+                'GoAAUP',
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
@@ -43,7 +45,6 @@ class HomePage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              // Subtitle
               const Text(
                 'Tracking & Reservation',
                 style: TextStyle(
@@ -52,7 +53,6 @@ class HomePage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 60),
-              // Bus Company Login Button
               _buildHomeButton(
                 context,
                 title: 'Bus Company Login',
@@ -61,12 +61,15 @@ class HomePage extends StatelessWidget {
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const BusCompanyLoginPage()),
+                    MaterialPageRoute(
+                      builder: (context) => const AuthLoginRouteGuard(
+                        child: BusCompanyLoginPage(),
+                      ),
+                    ),
                   );
                 },
               ),
               const SizedBox(height: 20),
-              // Driver Login Button
               _buildHomeButton(
                 context,
                 title: 'Driver Login',
@@ -75,28 +78,37 @@ class HomePage extends StatelessWidget {
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const DriverLoginPage()),
+                    MaterialPageRoute(
+                      builder: (context) => const AuthLoginRouteGuard(
+                        child: DriverLoginPage(),
+                      ),
+                    ),
                   );
                 },
               ),
               const SizedBox(height: 20),
-              // Student Login Button
               _buildHomeButton(
                 context,
                 title: 'Continue as Student',
                 color: Colors.white,
                 textColor: const Color(0xFF1A1C1E),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const StudentLoginPage()),
-                  );
-                },
+                onTap: () => _openStudentHome(context, ref),
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Future<void> _openStudentHome(BuildContext context, WidgetRef ref) async {
+    await activateGuestStudentSession(ref);
+    if (!context.mounted) {
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const StudentLoginPage()),
     );
   }
 
