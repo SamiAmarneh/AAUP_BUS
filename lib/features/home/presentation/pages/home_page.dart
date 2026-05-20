@@ -35,7 +35,7 @@ class HomePage extends StatelessWidget {
               const SizedBox(height: 30),
               // App Name
               const Text(
-                'AAUP Bus System',
+                'GoAAUP',
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
