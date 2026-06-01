@@ -81,9 +81,10 @@ AuthFailure mapFirestoreException(FirebaseException exception) {
   return switch (exception.code) {
     'permission-denied' => const AuthFailure(
       AuthFailureType.unauthorized,
-      'Firestore access denied for admin profile. Deploy firestore.rules '
-      '(firebase deploy --only firestore:rules) and create admins/{your UID} '
-      'with your email.',
+      'Firestore permission denied. Deploy the latest firestore.rules '
+      '(firebase deploy --only firestore:rules). If you recently added a '
+      'new collection such as routes or buses, the deployed rules must be '
+      'updated before admin CRUD will work.',
     ),
     'unavailable' => const AuthFailure(
       AuthFailureType.network,
