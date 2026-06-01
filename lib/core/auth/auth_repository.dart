@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../session/app_session_repository.dart';
 import 'app_user.dart';
+import '../../features/bus_company/domain/driver_status.dart';
 import 'auth_exceptions.dart';
 import 'firestore_collections.dart';
 import 'user_role.dart';
@@ -133,7 +134,7 @@ class AuthRepository {
         data: adminSnapshot.data() ?? {},
       ),
       UserRole.admin => _resolveAdminSignInProfile(uid),
-      UserRole.driver when hasDriver => AppUser.fromDriverDoc(
+      UserRole.driver when hasDriver => _buildDriverProfile(
         uid: uid,
         data: driverSnapshot.data() ?? {},
       ),
@@ -162,7 +163,7 @@ class AuthRepository {
       return AppUser.fromAdminDoc(uid: uid, data: adminSnapshot.data() ?? {});
     }
     if (hasDriver) {
-      return AppUser.fromDriverDoc(uid: uid, data: driverSnapshot.data() ?? {});
+      return _buildDriverProfile(uid: uid, data: driverSnapshot.data() ?? {});
     }
     return null;
   }
@@ -203,7 +204,9 @@ class AuthRepository {
       uid: uid,
     );
     if (driverSnapshot.exists) {
-      return AppUser.fromDriverDoc(uid: uid, data: driverSnapshot.data() ?? {});
+      final data = driverSnapshot.data() ?? {};
+      _assertDriverIsActive(data);
+      return AppUser.fromDriverDoc(uid: uid, data: data);
     }
 
     final adminSnapshot = await _getProfileDoc(
@@ -249,6 +252,21 @@ class AuthRepository {
   Future<void> _clearSignedInRole() async {
     final preferences = await SharedPreferences.getInstance();
     await preferences.remove(SessionStorageKeys.signedInRole);
+  }
+
+  AppUser _buildDriverProfile({
+    required String uid,
+    required Map<String, dynamic> data,
+  }) {
+    _assertDriverIsActive(data);
+    return AppUser.fromDriverDoc(uid: uid, data: data);
+  }
+
+  void _assertDriverIsActive(Map<String, dynamic> data) {
+    final status = data['status'];
+    if (status is String && status.trim() == DriverStatus.inactive) {
+      throw inactiveDriverFailure;
+    }
   }
 
   void _assertEmailMatchesProfile(String? authEmail, String profileEmail) {

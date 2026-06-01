@@ -72,6 +72,11 @@ AuthFailure roleMismatchFailure(UserRole expectedRole) {
   };
 }
 
+const AuthFailure inactiveDriverFailure = AuthFailure(
+  AuthFailureType.unauthorized,
+  'This driver account is inactive.',
+);
+
 AuthFailure mapFirestoreException(FirebaseException exception) {
   return switch (exception.code) {
     'permission-denied' => const AuthFailure(
