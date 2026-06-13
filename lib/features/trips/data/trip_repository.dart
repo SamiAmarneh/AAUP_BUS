@@ -34,6 +34,53 @@ class TripRepository {
         });
   }
 
+  Stream<List<TripProfile>> watchTripHistoryForDriver(String driverUid) {
+    final driverRef = _driverReference(driverUid);
+
+    return _firestore
+        .collection(FirestoreCollections.trips)
+        .where('driver_id', isEqualTo: driverRef)
+        .snapshots()
+        .map((snapshot) {
+          final trips = snapshot.docs
+              .map(
+                (doc) => TripProfile.fromFirestore(
+                  id: doc.id,
+                  data: doc.data(),
+                ),
+              )
+              .toList();
+          return _sortTripHistory(trips);
+        });
+  }
+
+  List<TripProfile> _sortTripHistory(List<TripProfile> trips) {
+    final sortedTrips = List<TripProfile>.from(trips);
+    sortedTrips.sort((first, second) {
+      final firstActive = first.isActive;
+      final secondActive = second.isActive;
+      if (firstActive != secondActive) {
+        return firstActive ? -1 : 1;
+      }
+
+      final firstSortKey = first.arrivalTime ?? first.departureTime;
+      final secondSortKey = second.arrivalTime ?? second.departureTime;
+
+      if (firstSortKey == null && secondSortKey == null) {
+        return 0;
+      }
+      if (firstSortKey == null) {
+        return 1;
+      }
+      if (secondSortKey == null) {
+        return -1;
+      }
+
+      return secondSortKey.compareTo(firstSortKey);
+    });
+    return sortedTrips;
+  }
+
   Future<TripProfile> createTrip({
     required String driverUid,
     required String routeId,

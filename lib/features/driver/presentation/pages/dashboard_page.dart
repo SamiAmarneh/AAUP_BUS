@@ -12,6 +12,7 @@ import '../../../trips/data/trip_providers.dart';
 import '../../../trips/domain/trip_details.dart';
 import '../../../trips/domain/trip_status.dart';
 import 'scanner_page.dart';
+import 'trip_history_page.dart';
 
 class DriverDashboardPage extends ConsumerWidget {
   const DriverDashboardPage({super.key});
@@ -360,6 +361,23 @@ class _DriverDashboardBodyState extends ConsumerState<_DriverDashboardBody> {
                     context,
                     MaterialPageRoute(
                       builder: (context) => const DriverScannerPage(),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 20),
+              _buildLargeActionCard(
+                context,
+                'Trip History',
+                'View all your past and current trips',
+                Icons.history,
+                const Color(0xFFE3F2FD),
+                const Color(0xFF1976D2),
+                () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const TripHistoryPage(),
                     ),
                   );
                 },
