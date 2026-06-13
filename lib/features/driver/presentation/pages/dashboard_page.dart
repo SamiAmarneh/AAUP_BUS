@@ -5,7 +5,6 @@ import '../../../../core/auth/auth_actions.dart';
 import '../../../../core/auth/auth_exceptions.dart';
 import '../../../../core/auth/auth_providers.dart';
 import '../../../../core/auth/user_role.dart';
-import '../../../../core/debug/agent_debug_log.dart';
 import '../../../bus_company/data/bus_providers.dart';
 import '../../../bus_company/data/route_providers.dart';
 import '../../../bus_company/domain/route_profile.dart';
@@ -125,54 +124,20 @@ class _DriverDashboardBodyState extends ConsumerState<_DriverDashboardBody> {
       if (!mounted) {
         return;
       }
-      // #region agent log
-      agentDebugLog(
-        location: 'dashboard_page.dart:_showCreateTripSheet',
-        message: 'Route load failed with AuthFailure',
-        hypothesisId: 'H7-H8',
-        data: {'message': failure.message},
-      );
-      // #endregion
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(failure.message)));
       return;
-    } catch (error) {
+    } catch (_) {
       if (!mounted) {
         return;
       }
-      // #region agent log
-      agentDebugLog(
-        location: 'dashboard_page.dart:_showCreateTripSheet',
-        message: 'Route load failed with unexpected error',
-        hypothesisId: 'H7-H8',
-        data: {
-          'errorType': error.runtimeType.toString(),
-          'error': error.toString(),
-        },
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not load routes. Please try again.')),
       );
-      // #endregion
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Could not load routes: $error')));
       return;
     }
 
-    // #region agent log
-    agentDebugLog(
-      location: 'dashboard_page.dart:_showCreateTripSheet',
-      message: 'Routes passed to create trip sheet',
-      hypothesisId: 'H3-H4',
-      data: {
-        'routesCount': routes.length,
-        'routeIds': routes.map((route) => route.id).toList(),
-        'routeLabels': routes
-            .map((route) => '${route.startLocation} → ${route.endLocation}')
-            .toList(),
-        'routeStatuses': routes.map((route) => route.status).toList(),
-      },
-    );
-    // #endregion
     if (routes.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No active routes available.')),
@@ -192,19 +157,12 @@ class _DriverDashboardBodyState extends ConsumerState<_DriverDashboardBody> {
     }
 
     await _runTripAction(() async {
-      final trip = await ref
-          .read(tripRepositoryProvider)
-          .createTrip(driverUid: widget.driverUid, routeId: selectedRouteId);
+      await ref.read(tripRepositoryProvider).createTrip(
+            driverUid: widget.driverUid,
+            routeId: selectedRouteId,
+          );
       ref.invalidate(activeTripForDriverProvider);
       ref.invalidate(driverActiveTripDetailsProvider);
-      // #region agent log
-      agentDebugLog(
-        location: 'dashboard_page.dart:_showCreateTripSheet',
-        message: 'Trip created from dashboard',
-        hypothesisId: 'H9-H10',
-        data: {'tripId': trip.id, 'routeId': selectedRouteId},
-      );
-      // #endregion
     });
   }
 
@@ -255,7 +213,6 @@ class _DriverDashboardBodyState extends ConsumerState<_DriverDashboardBody> {
     final trip = tripDetails?.trip;
     final routeLabel = tripDetails?.routeLabel ?? 'No active trip';
     final busLabel = tripDetails?.bus.name ?? assignedBusName ?? '—';
-    final statusLabel = trip?.statusLabel ?? 'No trip';
 
     return Column(
       children: [
@@ -559,44 +516,6 @@ class _DriverDashboardBodyState extends ConsumerState<_DriverDashboardBody> {
       ),
     );
   }
-
-  Widget _buildSmallStatCard(
-    String title,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 15),
-          Text(
-            title,
-            style: const TextStyle(color: Colors.blueGrey, fontSize: 12),
-          ),
-          const SizedBox(height: 5),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _CreateTripSheet extends StatefulWidget {
@@ -627,20 +546,6 @@ class _CreateTripSheetState extends State<_CreateTripSheet> {
 
   @override
   Widget build(BuildContext context) {
-    // #region agent log
-    agentDebugLog(
-      location: 'dashboard_page.dart:_CreateTripSheet.build',
-      message: 'Create trip sheet route list items',
-      hypothesisId: 'H4-H5-H6',
-      data: {
-        'routesCount': widget.routes.length,
-        'routeIds': widget.routes.map((route) => route.id).toList(),
-        'selectedRouteId': _selectedRouteId,
-        'routeLabels': widget.routes.map(_routeLabel).toList(),
-      },
-    );
-    // #endregion
-
     final listHeight = widget.routes.length * 72.0;
     final resolvedListHeight = listHeight > _maxListHeight
         ? _maxListHeight
@@ -684,9 +589,9 @@ class _CreateTripSheetState extends State<_CreateTripSheet> {
             ),
           ),
           const SizedBox(height: 8),
-          Text(
-            'Select a route for your new trip (${widget.routes.length} loaded).',
-            style: const TextStyle(fontSize: 15, color: Colors.blueGrey),
+          const Text(
+            'Select a route for your new trip.',
+            style: TextStyle(fontSize: 15, color: Colors.blueGrey),
           ),
           const SizedBox(height: 20),
           SizedBox(

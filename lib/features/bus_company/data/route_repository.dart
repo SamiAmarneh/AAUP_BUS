@@ -2,7 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../core/auth/auth_exceptions.dart';
 import '../../../core/auth/firestore_collections.dart';
-import '../../../core/debug/agent_debug_log.dart';
 import '../domain/route_profile.dart';
 import '../domain/route_status.dart';
 
@@ -19,37 +18,14 @@ class RouteRepository {
         .where('status', isEqualTo: RouteStatus.active)
         .snapshots()
         .map(
-          (snapshot) {
-            // #region agent log
-            agentDebugLog(
-              location: 'route_repository.dart:watchActiveRoutes',
-              message: 'Firestore routes snapshot',
-              hypothesisId: 'H1-H2',
-              data: {
-                'docCount': snapshot.docs.length,
-                'routes': snapshot.docs
-                    .map(
-                      (doc) => {
-                        'id': doc.id,
-                        'status': doc.data()['status'],
-                        'routeName': doc.data()['route_name'],
-                        'start': doc.data()['start_location'],
-                        'end': doc.data()['end_location'],
-                      },
-                    )
-                    .toList(),
-              },
-            );
-            // #endregion
-            return snapshot.docs
-                .map(
-                  (doc) => RouteProfile.fromFirestore(
-                    id: doc.id,
-                    data: doc.data(),
-                  ),
-                )
-                .toList();
-          },
+          (snapshot) => snapshot.docs
+              .map(
+                (doc) => RouteProfile.fromFirestore(
+                  id: doc.id,
+                  data: doc.data(),
+                ),
+              )
+              .toList(),
         );
   }
 
@@ -60,26 +36,6 @@ class RouteRepository {
           .where('status', isEqualTo: RouteStatus.active)
           .get();
 
-      // #region agent log
-      agentDebugLog(
-        location: 'route_repository.dart:fetchActiveRoutes',
-        message: 'Firestore routes one-shot fetch',
-        hypothesisId: 'H7-H8',
-        data: {
-          'docCount': snapshot.docs.length,
-          'routes': snapshot.docs
-              .map(
-                (doc) => {
-                  'id': doc.id,
-                  'status': doc.data()['status'],
-                  'routeName': doc.data()['route_name'],
-                },
-              )
-              .toList(),
-        },
-      );
-      // #endregion
-
       return snapshot.docs
           .map(
             (doc) => RouteProfile.fromFirestore(
@@ -89,17 +45,6 @@ class RouteRepository {
           )
           .toList();
     } on FirebaseException catch (exception) {
-      // #region agent log
-      agentDebugLog(
-        location: 'route_repository.dart:fetchActiveRoutes',
-        message: 'Firestore routes fetch failed',
-        hypothesisId: 'H7-H8',
-        data: {
-          'code': exception.code,
-          'message': exception.message,
-        },
-      );
-      // #endregion
       throw mapFirestoreException(exception);
     }
   }

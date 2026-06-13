@@ -2,7 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../core/auth/auth_exceptions.dart';
 import '../../../core/auth/firestore_collections.dart';
-import '../../../core/debug/agent_debug_log.dart';
 import '../../bus_company/data/bus_repository.dart';
 import '../domain/trip_profile.dart';
 import '../domain/trip_status.dart';
@@ -27,21 +26,6 @@ class TripRepository {
         .limit(1)
         .snapshots()
         .map((snapshot) {
-          // #region agent log
-          agentDebugLog(
-            location: 'trip_repository.dart:watchActiveTripForDriver',
-            message: 'Active trip snapshot',
-            hypothesisId: 'H9-H10',
-            data: {
-              'driverUid': driverUid,
-              'docCount': snapshot.docs.length,
-              'tripIds': snapshot.docs.map((doc) => doc.id).toList(),
-              'statuses': snapshot.docs
-                  .map((doc) => doc.data()['status'])
-                  .toList(),
-            },
-          );
-          // #endregion
           if (snapshot.docs.isEmpty) {
             return null;
           }
@@ -81,30 +65,13 @@ class TripRepository {
         'status': TripStatus.waitingPassengers,
       });
 
-      final createdTrip = TripProfile(
+      return TripProfile(
         id: docRef.id,
         driverUid: driverUid,
         busId: assignedBus.id,
         routeId: routeId,
         status: TripStatus.waitingPassengers,
       );
-
-      // #region agent log
-      agentDebugLog(
-        location: 'trip_repository.dart:createTrip',
-        message: 'Trip created',
-        hypothesisId: 'H9-H10',
-        data: {
-          'tripId': createdTrip.id,
-          'driverUid': driverUid,
-          'routeId': routeId,
-          'busId': assignedBus.id,
-          'status': createdTrip.status,
-        },
-      );
-      // #endregion
-
-      return createdTrip;
     } on FirebaseException catch (exception) {
       throw mapFirestoreException(exception);
     }
