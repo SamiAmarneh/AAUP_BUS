@@ -191,16 +191,6 @@ class _DriverDashboardBody extends StatelessWidget {
                     ),
                   ],
                 ),
-                
-                const SizedBox(height: 30),
-                const Text(
-                  'Assigned Schedule',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1A1C1E)),
-                ),
-                const SizedBox(height: 15),
-                
-                _buildTripScheduleItem('Morning Trip', '07:00 AM', 'Jenin', 'AAUP', true),
-                _buildTripScheduleItem('Return Trip', '03:30 PM', 'AAUP', 'Jenin', false),
               ],
             ),
           ),
@@ -278,41 +268,6 @@ class _DriverDashboardBody extends StatelessWidget {
           Text(title, style: const TextStyle(color: Colors.blueGrey, fontSize: 12)),
           const SizedBox(height: 5),
           Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTripScheduleItem(String name, String time, String from, String to, bool isActive) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 15),
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        border: isActive ? Border.all(color: const Color(0xFF4CAF50), width: 1) : null,
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: isActive ? const Color(0xFFE8F5E9) : const Color(0xFFF5F5F5),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(Icons.access_time, color: isActive ? const Color(0xFF4CAF50) : Colors.grey),
-          ),
-          const SizedBox(width: 15),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                Text('$from → $to', style: const TextStyle(color: Colors.blueGrey, fontSize: 13)),
-              ],
-            ),
-          ),
-          Text(time, style: const TextStyle(fontWeight: FontWeight.bold)),
         ],
       ),
     );
