@@ -191,6 +191,7 @@ class DriverTripHistoryNotifier extends Notifier<DriverTripHistoryState> {
           busName: busName,
           departureTime: trip.departureTime,
           arrivalTime: trip.arrivalTime,
+          createdAt: trip.createdAt,
         ),
       );
     }

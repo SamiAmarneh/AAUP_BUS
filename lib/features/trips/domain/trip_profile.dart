@@ -11,6 +11,7 @@ class TripProfile {
     required this.status,
     this.departureTime,
     this.arrivalTime,
+    this.createdAt,
   });
 
   final String id;
@@ -20,6 +21,7 @@ class TripProfile {
   final String status;
   final DateTime? departureTime;
   final DateTime? arrivalTime;
+  final DateTime? createdAt;
 
   bool get isActive => TripStatus.activeStatuses.contains(status);
 
@@ -37,6 +39,7 @@ class TripProfile {
       status: _readString(data, 'status'),
       departureTime: _readTimestamp(data, 'departure_time'),
       arrivalTime: _readTimestamp(data, 'arrival_time'),
+      createdAt: _readTimestamp(data, 'created_at'),
     );
   }
 

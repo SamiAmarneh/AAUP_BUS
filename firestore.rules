@@ -22,6 +22,7 @@ service cloud.firestore {
 
     function isWaitingPassengersCreate() {
       return request.resource.data.status == 'Waiting-Passengers'
+        && request.resource.data.created_at is timestamp
         && !('departure_time' in request.resource.data)
         && !('arrival_time' in request.resource.data)
         && request.resource.data.driver_id == driverRef()
@@ -34,6 +35,7 @@ service cloud.firestore {
         && request.resource.data.status == 'On-the-way'
         && request.resource.data.departure_time is timestamp
         && !('arrival_time' in request.resource.data)
+        && request.resource.data.created_at == resource.data.created_at
         && request.resource.data.driver_id == resource.data.driver_id
         && request.resource.data.bus_id == resource.data.bus_id
         && request.resource.data.route_id == resource.data.route_id;
@@ -44,6 +46,7 @@ service cloud.firestore {
         && request.resource.data.status == 'Arrived'
         && request.resource.data.arrival_time is timestamp
         && request.resource.data.departure_time == resource.data.departure_time
+        && request.resource.data.created_at == resource.data.created_at
         && request.resource.data.driver_id == resource.data.driver_id
         && request.resource.data.bus_id == resource.data.bus_id
         && request.resource.data.route_id == resource.data.route_id;

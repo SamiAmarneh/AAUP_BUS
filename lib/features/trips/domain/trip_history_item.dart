@@ -10,6 +10,7 @@ class TripHistoryItem {
     required this.busName,
     this.departureTime,
     this.arrivalTime,
+    this.createdAt,
   });
 
   static const int _minutesPerHour = 60;
@@ -22,8 +23,9 @@ class TripHistoryItem {
   final String busName;
   final DateTime? departureTime;
   final DateTime? arrivalTime;
+  final DateTime? createdAt;
 
-  DateTime? get sortKey => arrivalTime ?? departureTime;
+  DateTime? get sortKey => createdAt ?? arrivalTime ?? departureTime;
 
   String? get durationLabel {
     if (status != TripStatus.arrived) {

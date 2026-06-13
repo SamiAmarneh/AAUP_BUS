@@ -236,6 +236,14 @@ class _TripHistoryCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           _InfoRow(icon: Icons.directions_bus, label: 'Bus', value: trip.busName),
+          if (trip.createdAt != null) ...[
+            const SizedBox(height: 8),
+            _InfoRow(
+              icon: Icons.calendar_today_outlined,
+              label: 'Created',
+              value: _formatDateTime(trip.createdAt!),
+            ),
+          ],
           if (trip.departureTime != null) ...[
             const SizedBox(height: 8),
             _InfoRow(

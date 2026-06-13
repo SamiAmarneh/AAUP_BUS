@@ -42,31 +42,120 @@ class TripRepository {
     final driverRef = _driverReference(driverUid);
 
     try {
-      var query = _firestore
-          .collection(FirestoreCollections.trips)
-          .where('driver_id', isEqualTo: driverRef)
-          .orderBy(FieldPath.documentId, descending: true)
-          .limit(limit);
-
-      if (startAfter != null) {
-        query = query.startAfterDocument(startAfter);
+      return await _fetchTripHistoryPageIndexed(
+        driverRef: driverRef,
+        limit: limit,
+        startAfter: startAfter,
+      );
+    } on FirebaseException catch (exception) {
+      final isMissingIndex =
+          exception.code == 'failed-precondition' &&
+          (exception.message?.contains('index') ?? false);
+      if (!isMissingIndex) {
+        throw mapFirestoreException(exception);
       }
 
-      final snapshot = await query.get();
-      final trips = snapshot.docs
-          .map((doc) => TripProfile.fromFirestore(id: doc.id, data: doc.data()))
-          .toList();
+      return _fetchTripHistoryPageClientSorted(
+        driverRef: driverRef,
+        limit: limit,
+        startAfter: startAfter,
+      );
+    }
+  }
 
-      final lastDocument = snapshot.docs.isEmpty ? null : snapshot.docs.last;
+  Future<TripHistoryPageResult> _fetchTripHistoryPageIndexed({
+    required DocumentReference<Map<String, dynamic>> driverRef,
+    required int limit,
+    DocumentSnapshot<Map<String, dynamic>>? startAfter,
+  }) async {
+    var query = _firestore
+        .collection(FirestoreCollections.trips)
+        .where('driver_id', isEqualTo: driverRef)
+        .orderBy('created_at', descending: true)
+        .orderBy(FieldPath.documentId, descending: true)
+        .limit(limit);
+
+    if (startAfter != null) {
+      query = query.startAfterDocument(startAfter);
+    }
+
+    final snapshot = await query.get();
+    final trips = snapshot.docs
+        .map((doc) => TripProfile.fromFirestore(id: doc.id, data: doc.data()))
+        .toList();
+
+    final lastDocument = snapshot.docs.isEmpty ? null : snapshot.docs.last;
+
+    return TripHistoryPageResult(
+      trips: trips,
+      lastDocument: lastDocument,
+      hasMore: trips.length == limit,
+    );
+  }
+
+  Future<TripHistoryPageResult> _fetchTripHistoryPageClientSorted({
+    required DocumentReference<Map<String, dynamic>> driverRef,
+    required int limit,
+    DocumentSnapshot<Map<String, dynamic>>? startAfter,
+  }) async {
+    try {
+      final snapshot = await _firestore
+          .collection(FirestoreCollections.trips)
+          .where('driver_id', isEqualTo: driverRef)
+          .get();
+
+      final sortedTrips = snapshot.docs
+          .map((doc) => TripProfile.fromFirestore(id: doc.id, data: doc.data()))
+          .toList()
+        ..sort(_compareTripsByCreatedAtDesc);
+
+      var startIndex = 0;
+      if (startAfter != null) {
+        final cursorIndex = sortedTrips.indexWhere(
+          (trip) => trip.id == startAfter.id,
+        );
+        startIndex = cursorIndex >= 0 ? cursorIndex + 1 : 0;
+      }
+
+      final pageTrips = sortedTrips.skip(startIndex).take(limit).toList();
+      final hasMore = startIndex + pageTrips.length < sortedTrips.length;
+
+      DocumentSnapshot<Map<String, dynamic>>? lastDocument;
+      if (pageTrips.isNotEmpty) {
+        lastDocument = await _firestore
+            .collection(FirestoreCollections.trips)
+            .doc(pageTrips.last.id)
+            .get();
+      }
 
       return TripHistoryPageResult(
-        trips: trips,
+        trips: pageTrips,
         lastDocument: lastDocument,
-        hasMore: trips.length == limit,
+        hasMore: hasMore,
       );
     } on FirebaseException catch (exception) {
       throw mapFirestoreException(exception);
     }
+  }
+
+  int _compareTripsByCreatedAtDesc(TripProfile a, TripProfile b) {
+    final aCreated = a.createdAt;
+    final bCreated = b.createdAt;
+
+    if (aCreated != null && bCreated != null) {
+      final createdCompare = bCreated.compareTo(aCreated);
+      if (createdCompare != 0) {
+        return createdCompare;
+      }
+    }
+    if (aCreated != null && bCreated == null) {
+      return -1;
+    }
+    if (aCreated == null && bCreated != null) {
+      return 1;
+    }
+
+    return b.id.compareTo(a.id);
   }
 
   Future<TripProfile?> fetchActiveTripForDriver(String driverUid) async {
@@ -104,6 +193,7 @@ class TripRepository {
             'bus_id': _busReference(assignedBus.id),
             'route_id': _routeReference(routeId),
             'status': TripStatus.waitingPassengers,
+            'created_at': FieldValue.serverTimestamp(),
           });
 
       return TripProfile(
