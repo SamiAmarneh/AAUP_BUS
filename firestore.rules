@@ -12,6 +12,43 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/drivers/$(request.auth.uid));
     }
 
+    function driverRef() {
+      return /databases/$(database)/documents/drivers/$(request.auth.uid);
+    }
+
+    function isTripDriver(tripData) {
+      return tripData.driver_id == driverRef();
+    }
+
+    function isWaitingPassengersCreate() {
+      return request.resource.data.status == 'Waiting-Passengers'
+        && !('departure_time' in request.resource.data)
+        && !('arrival_time' in request.resource.data)
+        && request.resource.data.driver_id == driverRef()
+        && request.resource.data.bus_id is path
+        && request.resource.data.route_id is path;
+    }
+
+    function isStartTripUpdate() {
+      return resource.data.status == 'Waiting-Passengers'
+        && request.resource.data.status == 'On-the-way'
+        && request.resource.data.departure_time is timestamp
+        && !('arrival_time' in request.resource.data)
+        && request.resource.data.driver_id == resource.data.driver_id
+        && request.resource.data.bus_id == resource.data.bus_id
+        && request.resource.data.route_id == resource.data.route_id;
+    }
+
+    function isCompleteTripUpdate() {
+      return resource.data.status == 'On-the-way'
+        && request.resource.data.status == 'Arrived'
+        && request.resource.data.arrival_time is timestamp
+        && request.resource.data.departure_time == resource.data.departure_time
+        && request.resource.data.driver_id == resource.data.driver_id
+        && request.resource.data.bus_id == resource.data.bus_id
+        && request.resource.data.route_id == resource.data.route_id;
+    }
+
     match /admins/{adminId} {
       allow read: if request.auth != null && request.auth.uid == adminId;
       allow write: if isAdmin();
@@ -24,16 +61,23 @@ service cloud.firestore {
     }
 
     match /buses/{id} {
-      allow read, write: if isAdmin();
+      allow read: if isAdmin()
+        || (isDriver() && resource.data.driver_id == driverRef());
+      allow write: if isAdmin();
     }
 
     match /routes/{id} {
-      allow read, write: if isAdmin();
+      allow read: if isAdmin() || isDriver();
+      allow write: if isAdmin();
     }
 
     match /Trips/{id} {
       allow read: if request.auth != null;
-      allow write: if isAdmin();
+      allow create: if isDriver() && isWaitingPassengersCreate();
+      allow update: if isDriver()
+        && isTripDriver(resource.data)
+        && (isStartTripUpdate() || isCompleteTripUpdate());
+      allow delete: if isAdmin();
     }
 
     match /Reservation/{id} {

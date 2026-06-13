@@ -29,6 +29,46 @@ class BusRepository {
         );
   }
 
+  Stream<BusProfile?> watchBusForDriver(String driverUid) {
+    final driverRef = _driverReference(driverUid);
+
+    return _firestore
+        .collection(FirestoreCollections.buses)
+        .where('driver_id', isEqualTo: driverRef)
+        .where('status', isEqualTo: BusStatus.active)
+        .limit(1)
+        .snapshots()
+        .map((snapshot) {
+          if (snapshot.docs.isEmpty) {
+            return null;
+          }
+          final doc = snapshot.docs.first;
+          return BusProfile.fromFirestore(id: doc.id, data: doc.data());
+        });
+  }
+
+  Future<BusProfile?> fetchBusForDriver(String driverUid) async {
+    final driverRef = _driverReference(driverUid);
+
+    try {
+      final snapshot = await _firestore
+          .collection(FirestoreCollections.buses)
+          .where('driver_id', isEqualTo: driverRef)
+          .where('status', isEqualTo: BusStatus.active)
+          .limit(1)
+          .get();
+
+      if (snapshot.docs.isEmpty) {
+        return null;
+      }
+
+      final doc = snapshot.docs.first;
+      return BusProfile.fromFirestore(id: doc.id, data: doc.data());
+    } on FirebaseException catch (exception) {
+      throw mapFirestoreException(exception);
+    }
+  }
+
   Future<BusProfile> createBus({
     required String name,
     required int capacity,
