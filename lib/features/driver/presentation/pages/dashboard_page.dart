@@ -22,12 +22,10 @@ class DriverDashboardPage extends ConsumerWidget {
     final profileAsync = ref.watch(currentUserProfileProvider);
 
     return profileAsync.when(
-      loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      ),
-      error: (_, __) => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      ),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (_, __) =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
       data: (profile) {
         if (profileAsync.isRefreshing) {
           return const Scaffold(
@@ -89,15 +87,17 @@ class _DriverDashboardBodyState extends ConsumerState<_DriverDashboardBody> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(failure.message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(failure.message)));
     } catch (_) {
       if (!mounted) {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Something went wrong. Please try again.')),
+        const SnackBar(
+          content: Text('Something went wrong. Please try again.'),
+        ),
       );
     } finally {
       if (mounted) {
@@ -133,9 +133,9 @@ class _DriverDashboardBodyState extends ConsumerState<_DriverDashboardBody> {
         data: {'message': failure.message},
       );
       // #endregion
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(failure.message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(failure.message)));
       return;
     } catch (error) {
       if (!mounted) {
@@ -152,9 +152,9 @@ class _DriverDashboardBodyState extends ConsumerState<_DriverDashboardBody> {
         },
       );
       // #endregion
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not load routes: $error')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not load routes: $error')));
       return;
     }
 
@@ -191,24 +191,21 @@ class _DriverDashboardBodyState extends ConsumerState<_DriverDashboardBody> {
       return;
     }
 
-    await _runTripAction(
-      () async {
-        final trip = await ref.read(tripRepositoryProvider).createTrip(
-              driverUid: widget.driverUid,
-              routeId: selectedRouteId,
-            );
-        ref.invalidate(activeTripForDriverProvider);
-        ref.invalidate(driverActiveTripDetailsProvider);
-        // #region agent log
-        agentDebugLog(
-          location: 'dashboard_page.dart:_showCreateTripSheet',
-          message: 'Trip created from dashboard',
-          hypothesisId: 'H9-H10',
-          data: {'tripId': trip.id, 'routeId': selectedRouteId},
-        );
-        // #endregion
-      },
-    );
+    await _runTripAction(() async {
+      final trip = await ref
+          .read(tripRepositoryProvider)
+          .createTrip(driverUid: widget.driverUid, routeId: selectedRouteId);
+      ref.invalidate(activeTripForDriverProvider);
+      ref.invalidate(driverActiveTripDetailsProvider);
+      // #region agent log
+      agentDebugLog(
+        location: 'dashboard_page.dart:_showCreateTripSheet',
+        message: 'Trip created from dashboard',
+        hypothesisId: 'H9-H10',
+        data: {'tripId': trip.id, 'routeId': selectedRouteId},
+      );
+      // #endregion
+    });
   }
 
   Future<void> _startTrip(String tripId) async {
@@ -410,28 +407,6 @@ class _DriverDashboardBodyState extends ConsumerState<_DriverDashboardBody> {
                   );
                 },
               ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildSmallStatCard(
-                      'Total Passengers',
-                      '32/45',
-                      Icons.people,
-                      Colors.blue,
-                    ),
-                  ),
-                  const SizedBox(width: 15),
-                  Expanded(
-                    child: _buildSmallStatCard(
-                      'Trip Status',
-                      statusLabel,
-                      Icons.trending_up,
-                      Colors.orange,
-                    ),
-                  ),
-                ],
-              ),
             ],
           ),
         ),
@@ -441,7 +416,8 @@ class _DriverDashboardBodyState extends ConsumerState<_DriverDashboardBody> {
 
   Widget _buildTripActionCard(TripDetails? tripDetails) {
     final trip = tripDetails?.trip;
-    final hasAssignedBus = ref.watch(assignedBusForDriverProvider).valueOrNull != null;
+    final hasAssignedBus =
+        ref.watch(assignedBusForDriverProvider).valueOrNull != null;
 
     if (trip == null) {
       return _buildActionButton(
@@ -456,7 +432,9 @@ class _DriverDashboardBodyState extends ConsumerState<_DriverDashboardBody> {
 
     final isWaiting = trip.status == TripStatus.waitingPassengers;
     final actionLabel = isWaiting ? 'Start Trip' : 'Mark as Arrived';
-    final actionIcon = isWaiting ? Icons.play_arrow_rounded : Icons.flag_rounded;
+    final actionIcon = isWaiting
+        ? Icons.play_arrow_rounded
+        : Icons.flag_rounded;
     final action = isWaiting
         ? () => _startTrip(trip.id)
         : () => _completeTrip(trip.id);
@@ -664,8 +642,9 @@ class _CreateTripSheetState extends State<_CreateTripSheet> {
     // #endregion
 
     final listHeight = widget.routes.length * 72.0;
-    final resolvedListHeight =
-        listHeight > _maxListHeight ? _maxListHeight : listHeight;
+    final resolvedListHeight = listHeight > _maxListHeight
+        ? _maxListHeight
+        : listHeight;
 
     return Container(
       decoration: const BoxDecoration(
@@ -724,15 +703,17 @@ class _CreateTripSheetState extends State<_CreateTripSheet> {
                   title: Text(
                     _routeLabel(route),
                     style: TextStyle(
-                      fontWeight:
-                          isSelected ? FontWeight.bold : FontWeight.normal,
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.normal,
                     ),
                   ),
                   leading: Radio<String>(
                     value: route.id,
                     groupValue: _selectedRouteId,
                     activeColor: const Color(0xFF4CAF50),
-                    onChanged: (value) => setState(() => _selectedRouteId = value),
+                    onChanged: (value) =>
+                        setState(() => _selectedRouteId = value),
                   ),
                   onTap: () => setState(() => _selectedRouteId = route.id),
                 );
