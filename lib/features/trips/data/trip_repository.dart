@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../core/auth/auth_exceptions.dart';
 import '../../../core/auth/firestore_collections.dart';
 import '../../bus_company/data/bus_repository.dart';
+import '../domain/trip_history_page_result.dart';
 import '../domain/trip_profile.dart';
 import '../domain/trip_status.dart';
 
@@ -34,51 +35,50 @@ class TripRepository {
         });
   }
 
-  Stream<List<TripProfile>> watchTripHistoryForDriver(String driverUid) {
+  Future<TripHistoryPageResult> fetchTripHistoryPage({
+    required String driverUid,
+    required int limit,
+    DocumentSnapshot<Map<String, dynamic>>? startAfter,
+  }) async {
+    _validateDriverUid(driverUid);
     final driverRef = _driverReference(driverUid);
 
-    return _firestore
-        .collection(FirestoreCollections.trips)
-        .where('driver_id', isEqualTo: driverRef)
-        .snapshots()
-        .map((snapshot) {
-          final trips = snapshot.docs
-              .map(
-                (doc) => TripProfile.fromFirestore(
-                  id: doc.id,
-                  data: doc.data(),
-                ),
-              )
-              .toList();
-          return _sortTripHistory(trips);
-        });
+    try {
+      var query = _firestore
+          .collection(FirestoreCollections.trips)
+          .where('driver_id', isEqualTo: driverRef)
+          .orderBy(FieldPath.documentId, descending: true)
+          .limit(limit);
+
+      if (startAfter != null) {
+        query = query.startAfterDocument(startAfter);
+      }
+
+      final snapshot = await query.get();
+      final trips = snapshot.docs
+          .map(
+            (doc) => TripProfile.fromFirestore(
+              id: doc.id,
+              data: doc.data(),
+            ),
+          )
+          .toList();
+
+      final lastDocument =
+          snapshot.docs.isEmpty ? null : snapshot.docs.last;
+
+      return TripHistoryPageResult(
+        trips: trips,
+        lastDocument: lastDocument,
+        hasMore: trips.length == limit,
+      );
+    } on FirebaseException catch (exception) {
+      throw mapFirestoreException(exception);
+    }
   }
 
-  List<TripProfile> _sortTripHistory(List<TripProfile> trips) {
-    final sortedTrips = List<TripProfile>.from(trips);
-    sortedTrips.sort((first, second) {
-      final firstActive = first.isActive;
-      final secondActive = second.isActive;
-      if (firstActive != secondActive) {
-        return firstActive ? -1 : 1;
-      }
-
-      final firstSortKey = first.arrivalTime ?? first.departureTime;
-      final secondSortKey = second.arrivalTime ?? second.departureTime;
-
-      if (firstSortKey == null && secondSortKey == null) {
-        return 0;
-      }
-      if (firstSortKey == null) {
-        return 1;
-      }
-      if (secondSortKey == null) {
-        return -1;
-      }
-
-      return secondSortKey.compareTo(firstSortKey);
-    });
-    return sortedTrips;
+  Future<TripProfile?> fetchActiveTripForDriver(String driverUid) async {
+    return _fetchActiveTrip(driverUid);
   }
 
   Future<TripProfile> createTrip({

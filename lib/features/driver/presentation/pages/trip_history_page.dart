@@ -1,19 +1,55 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/auth/auth_exceptions.dart';
 import '../../../trips/data/trip_providers.dart';
+import '../../../trips/domain/trip_history_constants.dart';
 import '../../../trips/domain/trip_history_item.dart';
 import '../../../trips/domain/trip_status.dart';
 
-class TripHistoryPage extends ConsumerWidget {
+class TripHistoryPage extends ConsumerStatefulWidget {
   const TripHistoryPage({super.key});
 
+  @override
+  ConsumerState<TripHistoryPage> createState() => _TripHistoryPageState();
+}
+
+class _TripHistoryPageState extends ConsumerState<TripHistoryPage> {
   static const Color _primaryGreen = Color(0xFF4CAF50);
 
+  late final ScrollController _scrollController;
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final historyAsync = ref.watch(driverTripHistoryProvider);
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController()..addListener(_onScroll);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(driverTripHistoryNotifierProvider.notifier).loadInitial();
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController
+      ..removeListener(_onScroll)
+      ..dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    final position = _scrollController.position;
+    final threshold = TripHistoryConstants.scrollLoadThreshold;
+    final isNearBottom = position.pixels >= position.maxScrollExtent - threshold;
+
+    if (!isNearBottom) {
+      return;
+    }
+
+    ref.read(driverTripHistoryNotifierProvider.notifier).loadMore();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final historyState = ref.watch(driverTripHistoryNotifierProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FB),
@@ -26,21 +62,72 @@ class TripHistoryPage extends ConsumerWidget {
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
       ),
-      body: historyAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => _buildErrorState(context, ref, error),
-        data: (trips) => trips.isEmpty
-            ? _buildEmptyState()
-            : _buildTripList(trips),
+      body: _buildBody(historyState),
+    );
+  }
+
+  Widget _buildBody(DriverTripHistoryState historyState) {
+    if (historyState.isLoading && historyState.items.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (historyState.errorMessage != null && historyState.items.isEmpty) {
+      return _buildErrorState(historyState.errorMessage!);
+    }
+
+    if (historyState.items.isEmpty) {
+      return _buildEmptyState();
+    }
+
+    return RefreshIndicator(
+      onRefresh: () =>
+          ref.read(driverTripHistoryNotifierProvider.notifier).refresh(),
+      child: ListView.separated(
+        controller: _scrollController,
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(25),
+        itemCount: _listItemCount(historyState),
+        separatorBuilder: (context, index) {
+          if (index >= historyState.items.length) {
+            return const SizedBox.shrink();
+          }
+          return const SizedBox(height: 16);
+        },
+        itemBuilder: (context, index) {
+          if (index < historyState.items.length) {
+            return _TripHistoryCard(trip: historyState.items[index]);
+          }
+
+          if (historyState.isLoadingMore) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Center(child: CircularProgressIndicator()),
+            );
+          }
+
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Center(
+              child: Text(
+                'No more trips',
+                style: TextStyle(fontSize: 14, color: Colors.blueGrey),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
 
-  Widget _buildErrorState(BuildContext context, WidgetRef ref, Object error) {
-    final message = error is AuthFailure
-        ? error.message
-        : 'Could not load trip history. Please try again.';
+  int _listItemCount(DriverTripHistoryState historyState) {
+    final tripCount = historyState.items.length;
+    if (historyState.isLoadingMore || !historyState.hasMore) {
+      return tripCount + 1;
+    }
+    return tripCount;
+  }
 
+  Widget _buildErrorState(String message) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(25),
@@ -56,7 +143,9 @@ class TripHistoryPage extends ConsumerWidget {
             ),
             const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: () => ref.invalidate(driverTripHistoryProvider),
+              onPressed: () => ref
+                  .read(driverTripHistoryNotifierProvider.notifier)
+                  .loadInitial(),
               style: ElevatedButton.styleFrom(
                 backgroundColor: _primaryGreen,
                 foregroundColor: Colors.white,
@@ -70,40 +159,32 @@ class TripHistoryPage extends ConsumerWidget {
   }
 
   Widget _buildEmptyState() {
-    return const Center(
-      child: Padding(
-        padding: EdgeInsets.all(25),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.history, size: 64, color: Colors.blueGrey),
-            SizedBox(height: 16),
-            Text(
-              'No trips yet',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF1A1C1E),
-              ),
+    return RefreshIndicator(
+      onRefresh: () =>
+          ref.read(driverTripHistoryNotifierProvider.notifier).refresh(),
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: const [
+          SizedBox(height: 120),
+          Icon(Icons.history, size: 64, color: Colors.blueGrey),
+          SizedBox(height: 16),
+          Text(
+            'No trips yet',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1A1C1E),
             ),
-            SizedBox(height: 8),
-            Text(
-              'Your completed and active trips will appear here.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 15, color: Colors.blueGrey),
-            ),
-          ],
-        ),
+          ),
+          SizedBox(height: 8),
+          Text(
+            'Your completed and active trips will appear here.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 15, color: Colors.blueGrey),
+          ),
+        ],
       ),
-    );
-  }
-
-  Widget _buildTripList(List<TripHistoryItem> trips) {
-    return ListView.separated(
-      padding: const EdgeInsets.all(25),
-      itemCount: trips.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 16),
-      itemBuilder: (context, index) => _TripHistoryCard(trip: trips[index]),
     );
   }
 }
@@ -169,6 +250,14 @@ class _TripHistoryCard extends StatelessWidget {
               icon: Icons.flag_outlined,
               label: 'Arrived',
               value: _formatDateTime(trip.arrivalTime!),
+            ),
+          ],
+          if (trip.durationLabel != null) ...[
+            const SizedBox(height: 8),
+            _InfoRow(
+              icon: Icons.timer_outlined,
+              label: 'Duration',
+              value: trip.durationLabel!,
             ),
           ],
         ],
