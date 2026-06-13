@@ -134,7 +134,9 @@ class _DriverDashboardBodyState extends ConsumerState<_DriverDashboardBody> {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not load routes. Please try again.')),
+        const SnackBar(
+          content: Text('Could not load routes. Please try again.'),
+        ),
       );
       return;
     }
@@ -163,7 +165,7 @@ class _DriverDashboardBodyState extends ConsumerState<_DriverDashboardBody> {
             routeId: selectedRouteId,
           );
       ref.invalidate(activeTripForDriverProvider);
-      ref.invalidate(driverActiveTripDetailsProvider);
+      ref.invalidate(driverActiveTripDetailsStreamProvider);
     });
   }
 
@@ -181,7 +183,7 @@ class _DriverDashboardBodyState extends ConsumerState<_DriverDashboardBody> {
 
   @override
   Widget build(BuildContext context) {
-    final tripDetailsAsync = ref.watch(driverActiveTripDetailsProvider);
+    final tripDetailsAsync = ref.watch(driverActiveTripDetailsStreamProvider);
     final assignedBusAsync = ref.watch(assignedBusForDriverProvider);
 
     return Scaffold(

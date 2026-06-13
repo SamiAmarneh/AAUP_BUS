@@ -212,5 +212,5 @@ class DriverTripHistoryNotifier extends Notifier<DriverTripHistoryState> {
 
 final driverTripHistoryNotifierProvider =
     NotifierProvider<DriverTripHistoryNotifier, DriverTripHistoryState>(
-  DriverTripHistoryNotifier.new,
-);
+      DriverTripHistoryNotifier.new,
+    );

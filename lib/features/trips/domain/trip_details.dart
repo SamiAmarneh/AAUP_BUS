@@ -13,6 +13,5 @@ class TripDetails {
   final BusProfile bus;
   final RouteProfile route;
 
-  String get routeLabel =>
-      '${route.startLocation} → ${route.endLocation}';
+  String get routeLabel => '${route.startLocation} → ${route.endLocation}';
 }

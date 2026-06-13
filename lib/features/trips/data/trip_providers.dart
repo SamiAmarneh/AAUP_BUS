@@ -24,7 +24,9 @@ final activeTripForDriverProvider = StreamProvider<TripProfile?>((ref) {
   return ref.watch(tripRepositoryProvider).watchActiveTripForDriver(profile.uid);
 });
 
-final driverActiveTripDetailsProvider = StreamProvider<TripDetails?>((ref) {
+final driverActiveTripDetailsStreamProvider = StreamProvider<TripDetails?>((
+  ref,
+) {
   final profile = ref.watch(currentUserProfileProvider).valueOrNull;
   if (profile == null) {
     return Stream<TripDetails?>.value(null);

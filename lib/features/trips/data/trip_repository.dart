@@ -8,11 +8,9 @@ import '../domain/trip_profile.dart';
 import '../domain/trip_status.dart';
 
 class TripRepository {
-  TripRepository({
-    FirebaseFirestore? firestore,
-    BusRepository? busRepository,
-  })  : _firestore = firestore ?? FirebaseFirestore.instance,
-        _busRepository = busRepository ?? BusRepository(firestore: firestore);
+  TripRepository({FirebaseFirestore? firestore, BusRepository? busRepository})
+    : _firestore = firestore ?? FirebaseFirestore.instance,
+      _busRepository = busRepository ?? BusRepository(firestore: firestore);
 
   final FirebaseFirestore _firestore;
   final BusRepository _busRepository;
@@ -56,16 +54,10 @@ class TripRepository {
 
       final snapshot = await query.get();
       final trips = snapshot.docs
-          .map(
-            (doc) => TripProfile.fromFirestore(
-              id: doc.id,
-              data: doc.data(),
-            ),
-          )
+          .map((doc) => TripProfile.fromFirestore(id: doc.id, data: doc.data()))
           .toList();
 
-      final lastDocument =
-          snapshot.docs.isEmpty ? null : snapshot.docs.last;
+      final lastDocument = snapshot.docs.isEmpty ? null : snapshot.docs.last;
 
       return TripHistoryPageResult(
         trips: trips,
@@ -105,12 +97,14 @@ class TripRepository {
     }
 
     try {
-      final docRef = await _firestore.collection(FirestoreCollections.trips).add({
-        'driver_id': _driverReference(driverUid),
-        'bus_id': _busReference(assignedBus.id),
-        'route_id': _routeReference(routeId),
-        'status': TripStatus.waitingPassengers,
-      });
+      final docRef = await _firestore
+          .collection(FirestoreCollections.trips)
+          .add({
+            'driver_id': _driverReference(driverUid),
+            'bus_id': _busReference(assignedBus.id),
+            'route_id': _routeReference(routeId),
+            'status': TripStatus.waitingPassengers,
+          });
 
       return TripProfile(
         id: docRef.id,
@@ -136,10 +130,13 @@ class TripRepository {
     }
 
     try {
-      await _firestore.collection(FirestoreCollections.trips).doc(tripId).update({
-        'status': TripStatus.onTheWay,
-        'departure_time': FieldValue.serverTimestamp(),
-      });
+      await _firestore
+          .collection(FirestoreCollections.trips)
+          .doc(tripId)
+          .update({
+            'status': TripStatus.onTheWay,
+            'departure_time': FieldValue.serverTimestamp(),
+          });
     } on FirebaseException catch (exception) {
       throw mapFirestoreException(exception);
     }
@@ -157,10 +154,13 @@ class TripRepository {
     }
 
     try {
-      await _firestore.collection(FirestoreCollections.trips).doc(tripId).update({
-        'status': TripStatus.arrived,
-        'arrival_time': FieldValue.serverTimestamp(),
-      });
+      await _firestore
+          .collection(FirestoreCollections.trips)
+          .doc(tripId)
+          .update({
+            'status': TripStatus.arrived,
+            'arrival_time': FieldValue.serverTimestamp(),
+          });
     } on FirebaseException catch (exception) {
       throw mapFirestoreException(exception);
     }
@@ -190,14 +190,13 @@ class TripRepository {
 
   Future<TripProfile> _fetchTrip(String tripId) async {
     try {
-      final snapshot =
-          await _firestore.collection(FirestoreCollections.trips).doc(tripId).get();
+      final snapshot = await _firestore
+          .collection(FirestoreCollections.trips)
+          .doc(tripId)
+          .get();
 
       if (!snapshot.exists) {
-        throw const AuthFailure(
-          AuthFailureType.unknown,
-          'Trip not found.',
-        );
+        throw const AuthFailure(AuthFailureType.unknown, 'Trip not found.');
       }
 
       return TripProfile.fromFirestore(
@@ -223,28 +222,19 @@ class TripRepository {
 
   void _validateDriverUid(String driverUid) {
     if (driverUid.trim().isEmpty) {
-      throw const AuthFailure(
-        AuthFailureType.unknown,
-        'Driver is required.',
-      );
+      throw const AuthFailure(AuthFailureType.unknown, 'Driver is required.');
     }
   }
 
   void _validateRouteId(String routeId) {
     if (routeId.trim().isEmpty) {
-      throw const AuthFailure(
-        AuthFailureType.unknown,
-        'Route is required.',
-      );
+      throw const AuthFailure(AuthFailureType.unknown, 'Route is required.');
     }
   }
 
   void _validateTripId(String tripId) {
     if (tripId.trim().isEmpty) {
-      throw const AuthFailure(
-        AuthFailureType.unknown,
-        'Trip is required.',
-      );
+      throw const AuthFailure(AuthFailureType.unknown, 'Trip is required.');
     }
   }
 }
