@@ -30,6 +30,8 @@
 	<string>Main</string>
 	<key>NSCameraUsageDescription</key>
 	<string>يحتاج التطبيق إلى الكاميرا لمسح رمز QR الخاص بالطالب.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>يحتاج التطبيق إلى موقعك لعرض الحافلات القريبة وتتبع الرحلات.</string>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
