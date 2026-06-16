@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../../../core/auth/auth_actions.dart';
+import '../../../../core/permissions/location_permission_service.dart';
 import '../../../../core/auth/auth_exceptions.dart';
 import '../../../../core/auth/auth_providers.dart';
 import '../../../../core/auth/user_role.dart';
@@ -106,7 +108,68 @@ class _DriverDashboardBodyState extends ConsumerState<_DriverDashboardBody> {
     }
   }
 
+  Future<bool> _ensureLocationPermission() async {
+    final permissionStatus =
+        await LocationPermissionService().ensureGranted();
+    if (!mounted) {
+      return false;
+    }
+
+    switch (permissionStatus) {
+      case LocationPermissionStatus.granted:
+        return true;
+      case LocationPermissionStatus.denied:
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Location permission is required to create a trip.'),
+          ),
+        );
+        return false;
+      case LocationPermissionStatus.permanentlyDenied:
+        await _showLocationPermissionDialog();
+        return false;
+    }
+  }
+
+  Future<void> _showLocationPermissionDialog() async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Location Permission Required'),
+        content: const Text(
+          'Location access is required to create a trip. Please enable it in app settings.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              final opened = await openAppSettings();
+              if (!opened && mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Unable to open settings.'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            child: const Text('Open Settings'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _showCreateTripSheet() async {
+    final hasLocationPermission = await _ensureLocationPermission();
+    if (!hasLocationPermission) {
+      return;
+    }
+
     final assignedBus = ref.read(assignedBusForDriverProvider).valueOrNull;
     if (assignedBus == null) {
       ScaffoldMessenger.of(context).showSnackBar(

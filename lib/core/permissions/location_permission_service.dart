@@ -6,6 +6,12 @@ abstract final class PermissionStorageKeys {
   static const String locationRequested = 'location_permission_requested';
 }
 
+enum LocationPermissionStatus {
+  granted,
+  denied,
+  permanentlyDenied,
+}
+
 class LocationPermissionService {
   Future<void> requestOnFirstLaunch() async {
     if (kIsWeb) {
@@ -20,11 +26,42 @@ class LocationPermissionService {
     }
 
     await preferences.setBool(PermissionStorageKeys.locationRequested, true);
+    await _requestLocationPermission();
+  }
+
+  Future<LocationPermissionStatus> ensureGranted() async {
+    if (kIsWeb) {
+      return LocationPermissionStatus.granted;
+    }
 
     try {
-      await Permission.locationWhenInUse.request();
+      final currentStatus = await Permission.locationWhenInUse.status;
+      if (currentStatus.isGranted) {
+        return LocationPermissionStatus.granted;
+      }
+
+      if (currentStatus.isPermanentlyDenied) {
+        return LocationPermissionStatus.permanentlyDenied;
+      }
+
+      final updatedStatus = await _requestLocationPermission();
+      if (updatedStatus.isGranted) {
+        return LocationPermissionStatus.granted;
+      }
+
+      return updatedStatus.isPermanentlyDenied
+          ? LocationPermissionStatus.permanentlyDenied
+          : LocationPermissionStatus.denied;
     } catch (_) {
-      // Permission flow may fail on unsupported platforms; app continues.
+      return LocationPermissionStatus.denied;
+    }
+  }
+
+  Future<PermissionStatus> _requestLocationPermission() async {
+    try {
+      return await Permission.locationWhenInUse.request();
+    } catch (_) {
+      return PermissionStatus.denied;
     }
   }
 }
