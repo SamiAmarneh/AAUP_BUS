@@ -83,6 +83,16 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    match /bus_location/{locationId} {
+      allow read: if request.auth != null;
+      allow create: if isDriver()
+        && request.resource.data.bus_id is path
+        && request.resource.data.location is latlng
+        && request.resource.data.timestamp is timestamp
+        && get(request.resource.data.bus_id).data.driver_id == driverRef();
+      allow update, delete: if isAdmin();
+    }
+
     match /Reservation/{id} {
       allow read, write: if false;
     }
