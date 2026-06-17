@@ -217,13 +217,11 @@ class TripRepository {
       if (bus == null || bus.status != BusStatus.active) {
         continue;
       }
-
-      final tripDetails = TripDetails(trip: trip, bus: bus, route: route);
-      if (!tripDetails.hasAvailableSeats) {
+      if (trip.totalPassengers >= bus.capacity) {
         continue;
       }
 
-      details.add(tripDetails);
+      details.add(TripDetails(trip: trip, bus: bus, route: route));
     }
 
     return details;
