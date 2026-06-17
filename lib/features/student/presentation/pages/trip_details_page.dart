@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pro2/features/student/domain/models/trip_model.dart';
-import 'package:pro2/features/student/presentation/pages/payment_gateway_page.dart';
+import 'package:pro2/features/student/presentation/pages/phone_entry_page.dart';
 
 class TripDetailsPage extends StatelessWidget {
   final Trip trip;
@@ -80,7 +80,7 @@ class TripDetailsPage extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Route and Company
+                        // Route and bus
                         Text(
                           trip.route,
                           style: const TextStyle(
@@ -93,13 +93,13 @@ class TripDetailsPage extends StatelessWidget {
                         Row(
                           children: [
                             const Icon(
-                              Icons.business,
+                              Icons.directions_bus,
                               size: 14,
                               color: Color(0xFF62758A),
                             ),
                             const SizedBox(width: 6),
                             Text(
-                              trip.company,
+                              'Bus: ${trip.company}',
                               style: const TextStyle(
                                 fontSize: 12,
                                 color: Color(0xFF62758A),
@@ -358,7 +358,7 @@ class TripDetailsPage extends StatelessWidget {
                               context,
                               MaterialPageRoute(
                                 builder: (context) =>
-                                    PaymentGatewayPage(trip: trip),
+                                    PhoneEntryPage(trip: trip),
                               ),
                             );
                           },
@@ -370,7 +370,7 @@ class TripDetailsPage extends StatelessWidget {
                             elevation: 0,
                           ),
                           child: const Text(
-                            'Continue to Payment',
+                            'Book Now',
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 15,

@@ -1,52 +1,83 @@
 import 'package:flutter/material.dart';
-import 'package:pay/pay.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'package:pro2/features/student/domain/models/trip_model.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class PaymentGatewayPage extends StatelessWidget {
+import '../../../../core/auth/auth_exceptions.dart';
+import '../../data/reservation_providers.dart';
+import '../../data/student_reservation_providers.dart';
+import '../../data/student_trip_providers.dart';
+import '../../domain/models/trip_model.dart';
+import 'booking_confirmation_page.dart';
+
+class PaymentGatewayPage extends ConsumerStatefulWidget {
   final Trip trip;
+  final String phoneNumber;
 
-  const PaymentGatewayPage({super.key, required this.trip});
+  const PaymentGatewayPage({
+    super.key,
+    required this.trip,
+    required this.phoneNumber,
+  });
 
-  Future<void> _launchSecureUrl(String url, BuildContext context) async {
-    final uri = Uri.parse(url);
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Unable to open the secure payment gateway.'),
-        ),
-      );
+  @override
+  ConsumerState<PaymentGatewayPage> createState() => _PaymentGatewayPageState();
+}
+
+class _PaymentGatewayPageState extends ConsumerState<PaymentGatewayPage> {
+  bool _isProcessing = false;
+  String _selectedMethod = 'card';
+
+  Future<void> _completePayment() async {
+    if (_isProcessing) {
+      return;
     }
-  }
 
-  String get _paypalCheckoutUrl {
-    final itemName = Uri.encodeComponent(trip.route);
-    final amount = trip.price.toString();
-    return 'https://www.paypal.com/cgi-bin/webscr?cmd=_xclick&business=merchant%40example.com&currency_code=ILS&amount=$amount&item_name=$itemName';
-  }
+    setState(() => _isProcessing = true);
 
-  List<PaymentItem> get _paymentItems => [
-    PaymentItem(
-      label: trip.route,
-      amount: '${trip.price}.00',
-      status: PaymentItemStatus.final_price,
-    ),
-  ];
+    try {
+      final repository = ref.read(reservationRepositoryProvider);
+      final localStorage = ref.read(studentBookingLocalStorageProvider);
 
-  void _onApplePayResult(BuildContext context, Map<String, dynamic> result) {
-    final token = result['paymentMethodData']?['tokenizationData']?['token'];
-    if (token != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Apple Pay payment completed successfully.'),
+      final details = await repository.createBooking(
+        trip: widget.trip,
+        phoneNumber: widget.phoneNumber,
+      );
+
+      await localStorage.savePhoneNumber(widget.phoneNumber);
+      await localStorage.saveReservationId(details.reservationId);
+      await refreshStudentBrowseData(ref);
+      ref.invalidate(activeTicketsProvider);
+
+      if (!mounted) {
+        return;
+      }
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) =>
+              BookingConfirmationPage(reservationDetails: details),
         ),
       );
-    } else {
+    } on AuthFailure catch (failure) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(failure.message)),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Apple Pay payment failed or was cancelled.'),
+          content: Text('Payment failed. Please try again.'),
         ),
       );
+    } finally {
+      if (mounted) {
+        setState(() => _isProcessing = false);
+      }
     }
   }
 
@@ -54,7 +85,7 @@ class PaymentGatewayPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Secure Payment Gateway'),
+        title: const Text('Secure Payment'),
         backgroundColor: const Color(0xFF2563EB),
       ),
       body: Padding(
@@ -72,123 +103,151 @@ class PaymentGatewayPage extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             const Text(
-              'Your payment will be processed through a secure gateway using HTTPS encryption.',
+              'Your payment is processed through a secure encrypted gateway.',
               style: TextStyle(fontSize: 14, color: Color(0xFF62758A)),
             ),
             const SizedBox(height: 24),
             _buildSummaryCard(),
-            const SizedBox(height: 24),
-            _buildPaymentOption(
-              context,
-              icon: Icons.payment,
-              title: 'Pay with PayPal',
-              subtitle: 'Secure online payment with PayPal',
-              onTap: () => _launchSecureUrl(_paypalCheckoutUrl, context),
-            ),
-            const SizedBox(height: 14),
-            _buildPaymentOption(
-              context,
-              icon: Icons.lock,
-              title: 'Secure bank card checkout',
-              subtitle: 'Redirect to an encrypted secure payment page',
-              onTap: () {
-                _launchSecureUrl(
-                  'https://www.paypal.com/cgi-bin/webscr?cmd=_xclick&business=merchant%40example.com&currency_code=ILS&amount=${trip.price}&item_name=${Uri.encodeComponent(trip.route)}',
-                  context,
-                );
-              },
-            ),
-            const SizedBox(height: 14),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: const Color(0xFFE3E8F1)),
+            const SizedBox(height: 20),
+            const Text(
+              'Payment method',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF1F3A57),
               ),
+            ),
+            const SizedBox(height: 12),
+            _buildPaymentMethod(
+              id: 'card',
+              icon: Icons.credit_card,
+              title: 'Credit / Debit Card',
+              subtitle: 'Visa, Mastercard, and local cards',
+            ),
+            const SizedBox(height: 10),
+            _buildPaymentMethod(
+              id: 'wallet',
+              icon: Icons.account_balance_wallet_outlined,
+              title: 'Digital Wallet',
+              subtitle: 'Fast checkout with your saved wallet',
+            ),
+            const Spacer(),
+            Row(
+              children: const [
+                Icon(Icons.lock_outline, size: 16, color: Color(0xFF62758A)),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '256-bit SSL encryption protects your transaction.',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF62758A)),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton(
+                onPressed: _isProcessing ? null : _completePayment,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2563EB),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  elevation: 0,
+                ),
+                child: _isProcessing
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text(
+                        'Pay Now',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPaymentMethod({
+    required String id,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
+    final isSelected = _selectedMethod == id;
+
+    return InkWell(
+      onTap: () => setState(() => _selectedMethod = id),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected
+                ? const Color(0xFF2563EB)
+                : const Color(0xFFE3E8F1),
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: const Color(0xFF2563EB).withOpacity(0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: const Color(0xFF2563EB), size: 22),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 42,
-                        height: 42,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF2563EB).withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: const Icon(
-                          Icons.phone_iphone,
-                          color: Color(0xFF2563EB),
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: const [
-                            Text(
-                              'Pay with Apple Pay',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF1F3A57),
-                              ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              'Fast secure payment using Apple Pay',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Color(0xFF62758A),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  FutureBuilder<PaymentConfiguration>(
-                    future: PaymentConfiguration.fromAsset(
-                      'apple_pay_profile.json',
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1F3A57),
                     ),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState != ConnectionState.done) {
-                        return const Center(
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(vertical: 16),
-                            child: CircularProgressIndicator(),
-                          ),
-                        );
-                      }
-                      final config = snapshot.data;
-                      if (config == null) {
-                        return const SizedBox.shrink();
-                      }
-                      return ApplePayButton(
-                        paymentConfiguration: config,
-                        paymentItems: _paymentItems,
-                        style: ApplePayButtonStyle.black,
-                        type: ApplePayButtonType.buy,
-                        margin: const EdgeInsets.only(top: 8),
-                        onPaymentResult: (result) =>
-                            _onApplePayResult(context, result),
-                        loadingIndicator: const Center(
-                          child: CircularProgressIndicator(),
-                        ),
-                      );
-                    },
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF62758A),
+                    ),
                   ),
                 ],
               ),
             ),
-            const Spacer(),
-            const Text(
-              'Note: Replace merchant@example.com with your actual payment merchant account email or merchant ID in the code for a live deployment.',
-              style: TextStyle(fontSize: 12, color: Color(0xFF62758A)),
+            Icon(
+              isSelected
+                  ? Icons.radio_button_checked
+                  : Icons.radio_button_off,
+              color: isSelected
+                  ? const Color(0xFF2563EB)
+                  : const Color(0xFF62758A),
+              size: 20,
             ),
           ],
         ),
@@ -214,50 +273,31 @@ class PaymentGatewayPage extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            trip.route,
+            widget.trip.route,
             style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
               color: Color(0xFF1F3A57),
             ),
           ),
+          const SizedBox(height: 12),
+          _buildSummaryRow('Bus', widget.trip.company),
+          _buildSummaryRow('Phone', widget.phoneNumber),
           const SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Company',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF62758A)),
-                  ),
-                  Text(
-                    trip.company,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF1F3A57),
-                    ),
-                  ),
-                ],
+              const Text(
+                'Total',
+                style: TextStyle(fontSize: 12, color: Color(0xFF62758A)),
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  const Text(
-                    'Total',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF62758A)),
-                  ),
-                  Text(
-                    '₪ ${trip.price}',
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF2563EB),
-                    ),
-                  ),
-                ],
+              Text(
+                '₪ ${widget.trip.price}',
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF2563EB),
+                ),
               ),
             ],
           ),
@@ -266,65 +306,25 @@ class PaymentGatewayPage extends StatelessWidget {
     );
   }
 
-  Widget _buildPaymentOption(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(18),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xFFE3E8F1)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: const Color(0xFF2563EB).withOpacity(0.12),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(icon, color: const Color(0xFF2563EB)),
+  Widget _buildSummaryRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(fontSize: 12, color: Color(0xFF62758A)),
+          ),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF1F3A57),
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF1F3A57),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF62758A),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(
-              Icons.arrow_forward_ios,
-              size: 16,
-              color: Color(0xFF62758A),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

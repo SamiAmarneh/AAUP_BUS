@@ -302,10 +302,7 @@ class BrowseTripsPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildTripCard({
-    required BuildContext context,
-    required Trip trip,
-  }) {
+  Widget _buildTripCard({required BuildContext context, required Trip trip}) {
     final statusLabel = trip.status != null
         ? TripStatus.displayLabel(trip.status!)
         : null;
@@ -507,21 +504,14 @@ class BrowseTripsPage extends ConsumerWidget {
           const SizedBox(height: 16),
           Row(
             children: [
-              const Icon(
-                Icons.event_seat,
-                size: 18,
-                color: Color(0xFF00A86F),
-              ),
+              const Icon(Icons.event_seat, size: 18, color: Color(0xFF00A86F)),
               const SizedBox(width: 8),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
                     'Capacity',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Color(0xFF62758A),
-                    ),
+                    style: TextStyle(fontSize: 11, color: Color(0xFF62758A)),
                   ),
                   Text(
                     '${trip.availableSeats}/${trip.totalSeats}',

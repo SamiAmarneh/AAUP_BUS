@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/session/session_providers.dart';
 import 'browse_trips_page.dart';
 import 'live_tracking_page.dart';
+import 'my_tickets_page.dart';
 
 class StudentLoginPage extends ConsumerWidget {
   const StudentLoginPage({super.key, this.isSessionRoot = false});
@@ -124,6 +125,23 @@ class StudentLoginPage extends ConsumerWidget {
                           context,
                           MaterialPageRoute(
                             builder: (context) => const BrowseTripsPage(),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 18),
+                    _buildActionCard(
+                      context,
+                      title: 'My Tickets',
+                      subtitle: 'View your active reservations',
+                      icon: Icons.confirmation_number_outlined,
+                      color: const Color(0xFFFFF3E8),
+                      iconColor: const Color(0xFFFF8A3D),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const MyTicketsPage(),
                           ),
                         );
                       },

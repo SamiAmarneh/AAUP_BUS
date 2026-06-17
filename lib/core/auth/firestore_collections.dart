@@ -5,4 +5,6 @@ abstract final class FirestoreCollections {
   static const String routes = 'routes';
   static const String trips = 'Trips';
   static const String busLocation = 'bus_location';
+  static const String reservation = 'Reservation';
+  static const String payment = 'Payment';
 }
