@@ -148,26 +148,6 @@ class StudentLoginPage extends ConsumerWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildStatusCard(
-                      title: 'Next Trip',
-                      value: '08:00 AM',
-                      color: const Color(0xFFFFFFFF),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildStatusCard(
-                      title: 'Available',
-                      value: '12 Trips',
-                      color: const Color(0xFFF0F8FF),
-                    ),
-                  ),
-                ],
-              ),
             ],
           ),
         ),
