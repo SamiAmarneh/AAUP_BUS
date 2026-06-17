@@ -6,10 +6,7 @@ import 'browse_trips_page.dart';
 import 'live_tracking_page.dart';
 
 class StudentLoginPage extends ConsumerWidget {
-  const StudentLoginPage({
-    super.key,
-    this.isSessionRoot = false,
-  });
+  const StudentLoginPage({super.key, this.isSessionRoot = false});
 
   final bool isSessionRoot;
 
@@ -29,10 +26,17 @@ class StudentLoginPage extends ConsumerWidget {
                   if (isSessionRoot)
                     TextButton.icon(
                       onPressed: () => _switchRole(context, ref),
-                      icon: const Icon(Icons.swap_horiz, size: 18, color: Color(0xFF3B4B5A)),
+                      icon: const Icon(
+                        Icons.swap_horiz,
+                        size: 18,
+                        color: Color(0xFF3B4B5A),
+                      ),
                       label: const Text(
                         'Switch role',
-                        style: TextStyle(color: Color(0xFF3B4B5A), fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                          color: Color(0xFF3B4B5A),
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     )
                   else

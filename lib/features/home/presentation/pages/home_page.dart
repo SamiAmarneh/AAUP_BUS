@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/auth/auth_route_guard.dart';
 import '../../../bus_company/presentation/pages/login_page.dart';
 import '../../../driver/presentation/pages/login_page.dart';
-import '../../../student/presentation/pages/login_page.dart';
 import '../../../../core/session/session_providers.dart';
 
 class HomePage extends ConsumerWidget {
@@ -47,10 +46,7 @@ class HomePage extends ConsumerWidget {
               const SizedBox(height: 8),
               const Text(
                 'Tracking & Reservation',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.blueGrey,
-                ),
+                style: TextStyle(fontSize: 16, color: Colors.blueGrey),
               ),
               const SizedBox(height: 60),
               _buildHomeButton(
@@ -79,9 +75,8 @@ class HomePage extends ConsumerWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const AuthLoginRouteGuard(
-                        child: DriverLoginPage(),
-                      ),
+                      builder: (context) =>
+                          const AuthLoginRouteGuard(child: DriverLoginPage()),
                     ),
                   );
                 },
@@ -103,13 +98,6 @@ class HomePage extends ConsumerWidget {
 
   Future<void> _openStudentHome(BuildContext context, WidgetRef ref) async {
     await activateGuestStudentSession(ref);
-    if (!context.mounted) {
-      return;
-    }
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const StudentLoginPage()),
-    );
   }
 
   Widget _buildHomeButton(
@@ -135,10 +123,7 @@ class HomePage extends ConsumerWidget {
         ),
         child: Text(
           title,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
       ),
     );

@@ -24,9 +24,8 @@ class AuthGate extends ConsumerWidget {
         }
         return const _AuthenticatedHome();
       },
-      loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      ),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (_, __) => const _UnauthenticatedHome(),
     );
   }
@@ -46,9 +45,8 @@ class _UnauthenticatedHome extends ConsumerWidget {
         }
         return const HomePage();
       },
-      loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      ),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (_, __) => const HomePage(),
     );
   }
@@ -72,14 +70,13 @@ class _AuthenticatedHome extends ConsumerWidget {
         return switch (profile.role) {
           UserRole.admin => const AdminDashboardPage(),
           UserRole.driver => () {
-              ref.watch(busLocationTrackingProvider);
-              return const DriverDashboardPage();
-            }(),
+            ref.watch(busLocationTrackingProvider);
+            return const DriverDashboardPage();
+          }(),
         };
       },
-      loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      ),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (_, __) => const HomePage(),
     );
   }
