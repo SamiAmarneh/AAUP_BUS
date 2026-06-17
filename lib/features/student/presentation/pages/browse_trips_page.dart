@@ -470,7 +470,7 @@ class BrowseTripsPage extends ConsumerWidget {
                     ),
                   ),
                   Text(
-                    '${trip.totalSeats} seats',
+                    '${trip.availableSeats}/${trip.totalSeats}',
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,

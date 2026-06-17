@@ -29,6 +29,9 @@ class Trip {
     final routeGroupLabel = details.route.routeName.isNotEmpty
         ? details.route.routeName
         : details.route.startLocation;
+    final totalSeats = details.bus.capacity;
+    final bookedSeats = details.trip.totalPassengers;
+    final availableSeats = (totalSeats - bookedSeats).clamp(0, totalSeats);
 
     return Trip(
       id: details.trip.id,
@@ -39,8 +42,8 @@ class Trip {
       price: details.trip.price.round(),
       from: details.route.startLocation,
       to: details.route.endLocation,
-      availableSeats: details.bus.capacity,
-      totalSeats: details.bus.capacity,
+      availableSeats: availableSeats,
+      totalSeats: totalSeats,
     );
   }
 }

@@ -271,6 +271,7 @@ class TripRepository {
             'route_id': _routeReference(routeId),
             'status': TripStatus.waitingPassengers,
             'price': route.price,
+            'total_passengers': TripProfile.defaultTotalPassengers,
             'created_at': FieldValue.serverTimestamp(),
           });
 
@@ -281,6 +282,7 @@ class TripRepository {
         routeId: routeId,
         status: TripStatus.waitingPassengers,
         price: route.price,
+        totalPassengers: TripProfile.defaultTotalPassengers,
       );
     } on FirebaseException catch (exception) {
       throw mapFirestoreException(exception);

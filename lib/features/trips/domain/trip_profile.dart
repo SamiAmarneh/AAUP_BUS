@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'trip_status.dart';
 
 class TripProfile {
+  static const int defaultTotalPassengers = 0;
+
   const TripProfile({
     required this.id,
     required this.driverUid,
@@ -10,6 +12,7 @@ class TripProfile {
     required this.routeId,
     required this.status,
     required this.price,
+    this.totalPassengers = defaultTotalPassengers,
     this.departureTime,
     this.arrivalTime,
     this.createdAt,
@@ -21,6 +24,7 @@ class TripProfile {
   final String routeId;
   final String status;
   final double price;
+  final int totalPassengers;
   final DateTime? departureTime;
   final DateTime? arrivalTime;
   final DateTime? createdAt;
@@ -40,6 +44,7 @@ class TripProfile {
       routeId: _readReferenceId(data, 'route_id'),
       status: _readString(data, 'status'),
       price: _readPrice(data),
+      totalPassengers: _readInt(data, 'total_passengers'),
       departureTime: _readTimestamp(data, 'departure_time'),
       arrivalTime: _readTimestamp(data, 'arrival_time'),
       createdAt: _readTimestamp(data, 'created_at'),
@@ -78,5 +83,17 @@ class TripProfile {
       return value.toDouble();
     }
     return 0;
+  }
+
+  static int _readInt(
+    Map<String, dynamic> data,
+    String key, {
+    int fallback = defaultTotalPassengers,
+  }) {
+    final value = data[key];
+    if (value is num) {
+      return value.toInt();
+    }
+    return fallback;
   }
 }
