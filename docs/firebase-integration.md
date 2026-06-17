@@ -560,3 +560,21 @@ sequenceDiagram
 |------|------|
 | `firebase.json` | Firestore rules & indexes config |
 | `firestore.rules` | Security rules including guest booking (`isGuestBookingUpdate`, `isValidReservationCreate`) |
+| `firestore.indexes.json` | Composite indexes |
+| `.firebaserc` | Project alias |
+| `android/app/google-services.json` | Android Firebase app config |
+| `lib/firebase_options.dart` | Dart Firebase options (Android) |
+| `lib/features/student/data/student_route_providers.dart` | Student route filter data source |
+| `lib/features/student/data/student_trip_providers.dart` | Student available trips poll, route filter, `refreshStudentBrowseData()` |
+| `lib/features/student/presentation/pages/browse_trips_page.dart` | Student browse trips UI (pull-to-refresh, header refresh, error retry) |
+| `lib/features/trips/data/trip_providers.dart` | Shared `TripRepository` + driver active-trip stream providers |
+| `lib/features/trips/domain/trip_profile.dart` | Firestore trip model (`totalPassengers`, `defaultTotalPassengers`) |
+| `lib/features/trips/domain/trip_details.dart` | Joined trip + route + bus model; `hasAvailableSeats` |
+| `lib/features/trips/data/trip_repository.dart` | Trip queries; browse list sorted by `created_at` desc; full-bus filter |
+| `lib/features/student/domain/models/trip_model.dart` | UI `Trip` adapter from `TripDetails` (seat counts for cards) |
+| `lib/features/student/data/reservation_repository.dart` | Booking transaction + reservation/payment joins |
+| `lib/features/student/data/student_reservation_providers.dart` | `activeTicketsProvider`, `refreshActiveTickets()` |
+| `lib/features/student/data/student_booking_local_storage.dart` | Local phone + reservation ID persistence |
+| `lib/features/student/presentation/pages/my_tickets_page.dart` | Active tickets list (active trips only) |
+| `lib/features/student/presentation/pages/payment_gateway_page.dart` | Demo checkout; triggers Firestore booking |
+| `lib/core/validation/phone_number_validator.dart` | Palestinian phone validation |
