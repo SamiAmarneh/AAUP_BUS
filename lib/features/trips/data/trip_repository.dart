@@ -4,6 +4,9 @@ import '../../../core/auth/auth_exceptions.dart';
 import '../../../core/auth/firestore_collections.dart';
 import '../../bus_company/data/bus_repository.dart';
 import '../../bus_company/data/route_repository.dart';
+import '../../bus_company/domain/bus_status.dart';
+import '../../bus_company/domain/route_status.dart';
+import '../domain/trip_details.dart';
 import '../domain/trip_history_page_result.dart';
 import '../domain/trip_profile.dart';
 import '../domain/trip_status.dart';
@@ -167,6 +170,58 @@ class TripRepository {
 
   Future<TripProfile?> fetchActiveTripForDriver(String driverUid) async {
     return _fetchActiveTrip(driverUid);
+  }
+
+  Future<List<TripProfile>> fetchAvailableTrips({String? routeId}) async {
+    try {
+      final tripsById = <String, TripProfile>{};
+
+      for (final status in TripStatus.activeStatuses) {
+        var query = _firestore
+            .collection(FirestoreCollections.trips)
+            .where('status', isEqualTo: status);
+
+        if (routeId != null && routeId.trim().isNotEmpty) {
+          query = query.where('route_id', isEqualTo: _routeReference(routeId));
+        }
+
+        final snapshot = await query.get();
+        for (final doc in snapshot.docs) {
+          tripsById[doc.id] = TripProfile.fromFirestore(
+            id: doc.id,
+            data: doc.data(),
+          );
+        }
+      }
+
+      final trips = tripsById.values.toList()
+        ..sort(_compareTripsByCreatedAtDesc);
+
+      return trips;
+    } on FirebaseException catch (exception) {
+      throw mapFirestoreException(exception);
+    }
+  }
+
+  Future<List<TripDetails>> fetchAvailableTripDetails({String? routeId}) async {
+    final trips = await fetchAvailableTrips(routeId: routeId);
+    final details = <TripDetails>[];
+
+    for (final trip in trips) {
+      final route = await _routeRepository.fetchRouteById(trip.routeId);
+      final bus = await _busRepository.fetchBusById(trip.busId);
+
+      if (route == null || route.status != RouteStatus.active) {
+        continue;
+      }
+      if (bus == null || bus.status != BusStatus.active) {
+        continue;
+      }
+
+      details.add(TripDetails(trip: trip, bus: bus, route: route));
+    }
+
+    return details;
   }
 
   Future<TripProfile> createTrip({

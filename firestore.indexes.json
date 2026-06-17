@@ -59,6 +59,20 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "Trips",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "route_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []

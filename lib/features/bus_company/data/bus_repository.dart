@@ -69,6 +69,28 @@ class BusRepository {
     }
   }
 
+  Future<BusProfile?> fetchBusById(String busId) async {
+    if (busId.trim().isEmpty) {
+      return null;
+    }
+
+    try {
+      final snapshot =
+          await _firestore.collection(FirestoreCollections.buses).doc(busId).get();
+
+      if (!snapshot.exists) {
+        return null;
+      }
+
+      return BusProfile.fromFirestore(
+        id: snapshot.id,
+        data: snapshot.data() ?? {},
+      );
+    } on FirebaseException catch (exception) {
+      throw mapFirestoreException(exception);
+    }
+  }
+
   Future<BusProfile> createBus({
     required String name,
     required int capacity,
