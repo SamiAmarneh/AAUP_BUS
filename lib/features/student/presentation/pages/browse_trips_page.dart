@@ -452,65 +452,30 @@ class BrowseTripsPage extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  const Icon(
-                    Icons.access_time,
-                    size: 18,
-                    color: Color(0xFF62758A),
-                  ),
-                  const SizedBox(width: 8),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Departure',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Color(0xFF62758A),
-                        ),
-                      ),
-                      Text(
-                        trip.departure,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1F3A57),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+              const Icon(
+                Icons.event_seat,
+                size: 18,
+                color: Color(0xFF00A86F),
               ),
-              Row(
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(
-                    Icons.event_seat,
-                    size: 18,
-                    color: Color(0xFF00A86F),
+                  const Text(
+                    'Capacity',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF62758A),
+                    ),
                   ),
-                  const SizedBox(width: 8),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Capacity',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Color(0xFF62758A),
-                        ),
-                      ),
-                      Text(
-                        '${trip.totalSeats} seats',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF00A86F),
-                        ),
-                      ),
-                    ],
+                  Text(
+                    '${trip.totalSeats} seats',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF00A86F),
+                    ),
                   ),
                 ],
               ),

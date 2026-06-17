@@ -10,7 +10,6 @@ class Trip {
     required this.price,
     required this.from,
     required this.to,
-    required this.departure,
     required this.availableSeats,
     required this.totalSeats,
   });
@@ -23,12 +22,10 @@ class Trip {
   final int price;
   final String from;
   final String to;
-  final String departure;
   final int availableSeats;
   final int totalSeats;
 
   factory Trip.fromTripDetails(TripDetails details) {
-    final departureTime = details.trip.departureTime ?? details.trip.createdAt;
     final routeGroupLabel = details.route.routeName.isNotEmpty
         ? details.route.routeName
         : details.route.startLocation;
@@ -42,15 +39,8 @@ class Trip {
       price: details.trip.price.round(),
       from: details.route.startLocation,
       to: details.route.endLocation,
-      departure: departureTime != null ? _formatTime(departureTime) : '--:--',
       availableSeats: details.bus.capacity,
       totalSeats: details.bus.capacity,
     );
-  }
-
-  static String _formatTime(DateTime dateTime) {
-    final hour = dateTime.hour.toString().padLeft(2, '0');
-    final minute = dateTime.minute.toString().padLeft(2, '0');
-    return '$hour:$minute';
   }
 }
