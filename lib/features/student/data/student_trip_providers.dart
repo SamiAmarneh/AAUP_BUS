@@ -4,6 +4,7 @@ import '../../../core/firestore/firestore_refresh_constants.dart';
 import '../../trips/data/trip_repository.dart';
 import '../../trips/data/trip_providers.dart';
 import '../../trips/domain/trip_details.dart';
+import 'student_route_providers.dart';
 
 final selectedRouteFilterProvider = StateProvider<String?>((ref) => null);
 
@@ -32,4 +33,14 @@ Stream<List<TripDetails>> _availableTripsStream({
       const Duration(seconds: FirestoreRefreshConstants.listIntervalSeconds),
     );
   }
+}
+
+Future<void> refreshStudentBrowseData(WidgetRef ref) async {
+  ref.invalidate(studentActiveRoutesProvider);
+  ref.invalidate(studentAvailableTripsProvider);
+
+  await Future.wait([
+    ref.read(studentActiveRoutesProvider.future),
+    ref.read(studentAvailableTripsProvider.future),
+  ]);
 }

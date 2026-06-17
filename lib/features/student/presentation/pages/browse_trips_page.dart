@@ -23,7 +23,7 @@ class BrowseTripsPage extends ConsumerWidget {
       body: SafeArea(
         child: Column(
           children: [
-            _buildHeader(context),
+            _buildHeader(context, ref),
             routesAsync.when(
               data: (routes) => _buildRouteFilters(
                 ref: ref,
@@ -38,15 +38,34 @@ class BrowseTripsPage extends ConsumerWidget {
             ),
             Expanded(
               child: tripsAsync.when(
-                data: (tripDetails) => _buildTripsList(context, tripDetails),
+                data: (tripDetails) => _buildTripsList(
+                  context: context,
+                  ref: ref,
+                  tripDetails: tripDetails,
+                ),
                 loading: () => const Center(child: CircularProgressIndicator()),
                 error: (error, _) => Center(
                   child: Padding(
                     padding: const EdgeInsets.all(24),
-                    child: Text(
-                      'Unable to load trips. Please try again.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.red[700]),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Unable to load trips. Please try again.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.red[700]),
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          onPressed: () => refreshStudentBrowseData(ref),
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Retry'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2563EB),
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -58,7 +77,7 @@ class BrowseTripsPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildHeader(BuildContext context, WidgetRef ref) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
@@ -86,6 +105,22 @@ class BrowseTripsPage extends ConsumerWidget {
                     Icons.arrow_back_ios,
                     color: Colors.white,
                     size: 20,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              InkWell(
+                onTap: () => refreshStudentBrowseData(ref),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.refresh,
+                    color: Colors.white,
+                    size: 22,
                   ),
                 ),
               ),
@@ -170,15 +205,29 @@ class BrowseTripsPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildTripsList(BuildContext context, List<TripDetails> tripDetails) {
+  Widget _buildTripsList({
+    required BuildContext context,
+    required WidgetRef ref,
+    required List<TripDetails> tripDetails,
+  }) {
     if (tripDetails.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(24),
-          child: Text(
-            'No trips available right now.',
-            style: TextStyle(fontSize: 16, color: Color(0xFF62758A)),
-          ),
+      return RefreshIndicator(
+        onRefresh: () => refreshStudentBrowseData(ref),
+        color: const Color(0xFF2563EB),
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          children: [
+            SizedBox(
+              height: MediaQuery.sizeOf(context).height * 0.45,
+              child: const Center(
+                child: Text(
+                  'No trips available right now.',
+                  style: TextStyle(fontSize: 16, color: Color(0xFF62758A)),
+                ),
+              ),
+            ),
+          ],
         ),
       );
     }
@@ -189,62 +238,67 @@ class BrowseTripsPage extends ConsumerWidget {
       groupedTrips.putIfAbsent(trip.city, () => []).add(trip);
     }
 
-    return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      children: [
-        ...groupedTrips.entries.map(
-          (entry) => Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(top: 16, bottom: 12),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF2563EB).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(
-                        Icons.route,
-                        color: Color(0xFF2563EB),
-                        size: 18,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          entry.key,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF1F3A57),
-                          ),
+    return RefreshIndicator(
+      onRefresh: () => refreshStudentBrowseData(ref),
+      color: const Color(0xFF2563EB),
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        children: [
+          ...groupedTrips.entries.map(
+            (entry) => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 16, bottom: 12),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2563EB).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                        Text(
-                          '${entry.value.length} trips available',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF62758A),
-                          ),
+                        child: const Icon(
+                          Icons.route,
+                          color: Color(0xFF2563EB),
+                          size: 18,
                         ),
-                      ],
-                    ),
-                  ],
+                      ),
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            entry.key,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1F3A57),
+                            ),
+                          ),
+                          Text(
+                            '${entry.value.length} trips available',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF62758A),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              ...entry.value.map(
-                (trip) => _buildTripCard(context: context, trip: trip),
-              ),
-              const SizedBox(height: 8),
-            ],
+                ...entry.value.map(
+                  (trip) => _buildTripCard(context: context, trip: trip),
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 20),
-      ],
+          const SizedBox(height: 20),
+        ],
+      ),
     );
   }
 
