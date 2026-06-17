@@ -218,7 +218,12 @@ class TripRepository {
         continue;
       }
 
-      details.add(TripDetails(trip: trip, bus: bus, route: route));
+      final tripDetails = TripDetails(trip: trip, bus: bus, route: route);
+      if (!tripDetails.hasAvailableSeats) {
+        continue;
+      }
+
+      details.add(tripDetails);
     }
 
     return details;

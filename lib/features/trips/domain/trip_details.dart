@@ -14,4 +14,6 @@ class TripDetails {
   final RouteProfile route;
 
   String get routeLabel => '${route.startLocation} → ${route.endLocation}';
+
+  bool get hasAvailableSeats => trip.totalPassengers < bus.capacity;
 }
