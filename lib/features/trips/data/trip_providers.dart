@@ -13,6 +13,7 @@ export 'driver_trip_history_notifier.dart';
 final tripRepositoryProvider = Provider<TripRepository>((ref) {
   return TripRepository(
     busRepository: ref.watch(busRepositoryProvider),
+    routeRepository: ref.watch(routeRepositoryProvider),
   );
 });
 

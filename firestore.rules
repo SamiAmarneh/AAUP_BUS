@@ -23,6 +23,8 @@ service cloud.firestore {
     function isWaitingPassengersCreate() {
       return request.resource.data.status == 'Waiting-Passengers'
         && request.resource.data.created_at is timestamp
+        && request.resource.data.price is number
+        && request.resource.data.price > 0
         && !('departure_time' in request.resource.data)
         && !('arrival_time' in request.resource.data)
         && request.resource.data.driver_id == driverRef()
@@ -38,7 +40,8 @@ service cloud.firestore {
         && request.resource.data.created_at == resource.data.created_at
         && request.resource.data.driver_id == resource.data.driver_id
         && request.resource.data.bus_id == resource.data.bus_id
-        && request.resource.data.route_id == resource.data.route_id;
+        && request.resource.data.route_id == resource.data.route_id
+        && request.resource.data.price == resource.data.price;
     }
 
     function isCompleteTripUpdate() {
@@ -49,7 +52,8 @@ service cloud.firestore {
         && request.resource.data.created_at == resource.data.created_at
         && request.resource.data.driver_id == resource.data.driver_id
         && request.resource.data.bus_id == resource.data.bus_id
-        && request.resource.data.route_id == resource.data.route_id;
+        && request.resource.data.route_id == resource.data.route_id
+        && request.resource.data.price == resource.data.price;
     }
 
     match /admins/{adminId} {

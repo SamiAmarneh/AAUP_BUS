@@ -75,11 +75,13 @@ class RouteRepository {
     required String routeName,
     required String startLocation,
     required String endLocation,
+    required double price,
   }) async {
     _validateRouteInput(
       routeName: routeName,
       startLocation: startLocation,
       endLocation: endLocation,
+      price: price,
     );
 
     final trimmedRouteName = routeName.trim();
@@ -93,6 +95,7 @@ class RouteRepository {
         'start_location': trimmedStartLocation,
         'end_location': trimmedEndLocation,
         'status': RouteStatus.active,
+        'price': price,
       });
 
       return RouteProfile(
@@ -101,6 +104,7 @@ class RouteRepository {
         startLocation: trimmedStartLocation,
         endLocation: trimmedEndLocation,
         status: RouteStatus.active,
+        price: price,
       );
     } on FirebaseException catch (exception) {
       throw mapFirestoreException(exception);
@@ -112,11 +116,13 @@ class RouteRepository {
     required String routeName,
     required String startLocation,
     required String endLocation,
+    required double price,
   }) async {
     _validateRouteInput(
       routeName: routeName,
       startLocation: startLocation,
       endLocation: endLocation,
+      price: price,
     );
 
     try {
@@ -124,6 +130,7 @@ class RouteRepository {
         'route_name': routeName.trim(),
         'start_location': startLocation.trim(),
         'end_location': endLocation.trim(),
+        'price': price,
       });
     } on FirebaseException catch (exception) {
       throw mapFirestoreException(exception);
@@ -144,6 +151,7 @@ class RouteRepository {
     required String routeName,
     required String startLocation,
     required String endLocation,
+    required double price,
   }) {
     if (routeName.trim().isEmpty) {
       throw const AuthFailure(
@@ -163,6 +171,13 @@ class RouteRepository {
       throw const AuthFailure(
         AuthFailureType.unknown,
         'End location is required.',
+      );
+    }
+
+    if (price <= 0) {
+      throw const AuthFailure(
+        AuthFailureType.unknown,
+        'Price must be greater than zero.',
       );
     }
   }

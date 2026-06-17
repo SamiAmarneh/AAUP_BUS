@@ -696,6 +696,13 @@ class _CreateTripSheetState extends State<_CreateTripSheet> {
                           : FontWeight.normal,
                     ),
                   ),
+                  subtitle: Text(
+                    '₪ ${route.price.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      color: Color(0xFF247BFF),
+                      fontSize: 14,
+                    ),
+                  ),
                   leading: Radio<String>(
                     value: route.id,
                     groupValue: _selectedRouteId,

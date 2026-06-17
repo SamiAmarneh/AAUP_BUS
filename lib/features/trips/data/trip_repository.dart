@@ -3,17 +3,24 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../core/auth/auth_exceptions.dart';
 import '../../../core/auth/firestore_collections.dart';
 import '../../bus_company/data/bus_repository.dart';
+import '../../bus_company/data/route_repository.dart';
 import '../domain/trip_history_page_result.dart';
 import '../domain/trip_profile.dart';
 import '../domain/trip_status.dart';
 
 class TripRepository {
-  TripRepository({FirebaseFirestore? firestore, BusRepository? busRepository})
-    : _firestore = firestore ?? FirebaseFirestore.instance,
-      _busRepository = busRepository ?? BusRepository(firestore: firestore);
+  TripRepository({
+    FirebaseFirestore? firestore,
+    BusRepository? busRepository,
+    RouteRepository? routeRepository,
+  }) : _firestore = firestore ?? FirebaseFirestore.instance,
+       _busRepository = busRepository ?? BusRepository(firestore: firestore),
+       _routeRepository =
+           routeRepository ?? RouteRepository(firestore: firestore);
 
   final FirebaseFirestore _firestore;
   final BusRepository _busRepository;
+  final RouteRepository _routeRepository;
 
   Stream<TripProfile?> watchActiveTripForDriver(String driverUid) {
     final driverRef = _driverReference(driverUid);
@@ -185,6 +192,21 @@ class TripRepository {
       );
     }
 
+    final route = await _routeRepository.fetchRouteById(routeId);
+    if (route == null) {
+      throw const AuthFailure(
+        AuthFailureType.unknown,
+        'Route not found.',
+      );
+    }
+
+    if (route.price <= 0) {
+      throw const AuthFailure(
+        AuthFailureType.unknown,
+        'This route has no price set. Contact your administrator.',
+      );
+    }
+
     try {
       final docRef = await _firestore
           .collection(FirestoreCollections.trips)
@@ -193,6 +215,7 @@ class TripRepository {
             'bus_id': _busReference(assignedBus.id),
             'route_id': _routeReference(routeId),
             'status': TripStatus.waitingPassengers,
+            'price': route.price,
             'created_at': FieldValue.serverTimestamp(),
           });
 
@@ -202,6 +225,7 @@ class TripRepository {
         busId: assignedBus.id,
         routeId: routeId,
         status: TripStatus.waitingPassengers,
+        price: route.price,
       );
     } on FirebaseException catch (exception) {
       throw mapFirestoreException(exception);

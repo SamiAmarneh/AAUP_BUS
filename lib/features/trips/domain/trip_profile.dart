@@ -9,6 +9,7 @@ class TripProfile {
     required this.busId,
     required this.routeId,
     required this.status,
+    required this.price,
     this.departureTime,
     this.arrivalTime,
     this.createdAt,
@@ -19,6 +20,7 @@ class TripProfile {
   final String busId;
   final String routeId;
   final String status;
+  final double price;
   final DateTime? departureTime;
   final DateTime? arrivalTime;
   final DateTime? createdAt;
@@ -37,6 +39,7 @@ class TripProfile {
       busId: _readReferenceId(data, 'bus_id'),
       routeId: _readReferenceId(data, 'route_id'),
       status: _readString(data, 'status'),
+      price: _readPrice(data),
       departureTime: _readTimestamp(data, 'departure_time'),
       arrivalTime: _readTimestamp(data, 'arrival_time'),
       createdAt: _readTimestamp(data, 'created_at'),
@@ -67,5 +70,13 @@ class TripProfile {
   static DateTime? _readTimestamp(Map<String, dynamic> data, String key) {
     final value = data[key];
     return value is Timestamp ? value.toDate() : null;
+  }
+
+  static double _readPrice(Map<String, dynamic> data) {
+    final value = data['price'];
+    if (value is num) {
+      return value.toDouble();
+    }
+    return 0;
   }
 }

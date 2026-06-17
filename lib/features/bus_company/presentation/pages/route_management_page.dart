@@ -232,6 +232,15 @@ class _RouteManagementPageState extends ConsumerState<RouteManagementPage> {
                               fontSize: 14,
                             ),
                           ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '₪ ${route.price.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              color: Color(0xFF247BFF),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ],
                       ),
                     ],
@@ -317,6 +326,7 @@ class _RouteFormSheetState extends ConsumerState<_RouteFormSheet> {
   late final TextEditingController _routeNameController;
   late final TextEditingController _startLocationController;
   late final TextEditingController _endLocationController;
+  late final TextEditingController _priceController;
   var _isSaving = false;
   String? _errorMessage;
 
@@ -334,6 +344,11 @@ class _RouteFormSheetState extends ConsumerState<_RouteFormSheet> {
     _endLocationController = TextEditingController(
       text: widget.existingRoute?.endLocation ?? '',
     );
+    _priceController = TextEditingController(
+      text: widget.existingRoute != null && widget.existingRoute!.price > 0
+          ? widget.existingRoute!.price.toString()
+          : '',
+    );
   }
 
   @override
@@ -341,6 +356,7 @@ class _RouteFormSheetState extends ConsumerState<_RouteFormSheet> {
     _routeNameController.dispose();
     _startLocationController.dispose();
     _endLocationController.dispose();
+    _priceController.dispose();
     super.dispose();
   }
 
@@ -348,12 +364,22 @@ class _RouteFormSheetState extends ConsumerState<_RouteFormSheet> {
     final routeName = _routeNameController.text.trim();
     final startLocation = _startLocationController.text.trim();
     final endLocation = _endLocationController.text.trim();
+    final price = double.tryParse(_priceController.text.trim()) ?? 0;
 
     if (routeName.isEmpty ||
         startLocation.isEmpty ||
-        endLocation.isEmpty) {
+        endLocation.isEmpty ||
+        _priceController.text.trim().isEmpty) {
       setState(
-        () => _errorMessage = 'Route name, start location, and end location are required.',
+        () => _errorMessage =
+            'Route name, start location, end location, and price are required.',
+      );
+      return;
+    }
+
+    if (price <= 0) {
+      setState(
+        () => _errorMessage = 'Price must be greater than zero.',
       );
       return;
     }
@@ -371,12 +397,14 @@ class _RouteFormSheetState extends ConsumerState<_RouteFormSheet> {
           routeName: routeName,
           startLocation: startLocation,
           endLocation: endLocation,
+          price: price,
         );
       } else {
         await repository.createRoute(
           routeName: routeName,
           startLocation: startLocation,
           endLocation: endLocation,
+          price: price,
         );
       }
 
@@ -417,9 +445,14 @@ class _RouteFormSheetState extends ConsumerState<_RouteFormSheet> {
         ),
       );
 
-  Widget _buildTextField(TextEditingController controller, String hint) {
+  Widget _buildTextField(
+    TextEditingController controller,
+    String hint, {
+    TextInputType keyboardType = TextInputType.text,
+  }) {
     return TextField(
       controller: controller,
+      keyboardType: keyboardType,
       decoration: InputDecoration(
         hintText: hint,
         filled: true,
@@ -481,6 +514,13 @@ class _RouteFormSheetState extends ConsumerState<_RouteFormSheet> {
             const SizedBox(height: 20),
             _buildInputLabel('End Location'),
             _buildTextField(_endLocationController, 'e.g., university'),
+            const SizedBox(height: 20),
+            _buildInputLabel('Price (₪)'),
+            _buildTextField(
+              _priceController,
+              'e.g., 15.50',
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            ),
             if (_errorMessage != null) ...[
               const SizedBox(height: 16),
               Text(

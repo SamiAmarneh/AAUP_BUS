@@ -7,6 +7,7 @@ class RouteProfile {
     required this.startLocation,
     required this.endLocation,
     required this.status,
+    required this.price,
   });
 
   final String id;
@@ -14,6 +15,7 @@ class RouteProfile {
   final String startLocation;
   final String endLocation;
   final String status;
+  final double price;
 
   factory RouteProfile.fromFirestore({
     required String id,
@@ -25,7 +27,16 @@ class RouteProfile {
       startLocation: _readString(data, 'start_location'),
       endLocation: _readString(data, 'end_location'),
       status: _readString(data, 'status', fallback: RouteStatus.active),
+      price: _readPrice(data),
     );
+  }
+
+  static double _readPrice(Map<String, dynamic> data) {
+    final value = data['price'];
+    if (value is num) {
+      return value.toDouble();
+    }
+    return 0;
   }
 
   static String _readString(
