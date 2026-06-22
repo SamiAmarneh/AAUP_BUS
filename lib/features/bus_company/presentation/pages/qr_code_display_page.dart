@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'dart:typed_data';
+import '../../../../core/reservation/reservation_qr_data_codec.dart';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:screenshot/screenshot.dart';
@@ -47,7 +48,11 @@ class _QRCodeDisplayPageState extends State<QRCodeDisplayPage> {
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     final random = Random().nextInt(999);
     uniqueCode = 'TRP-$timestamp-$random';
-    qrData = 'ID: $uniqueCode | Trip: ${widget.tripName} | Bus: ${widget.busId}';
+    qrData = ReservationQrDataCodec.encodeReservationQrData(
+      id: uniqueCode,
+      trip: widget.tripName,
+      bus: widget.busId,
+    );
   }
 
   Future<void> _shareQRCode() async {

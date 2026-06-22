@@ -234,7 +234,7 @@ Student booking records. Document ID is used in `qr_data` for driver scanner che
 | `trip_id` | DocumentReference | → `Trips/{id}` |
 | `reservation_time` | timestamp | Server timestamp at booking |
 | `phone_number` | string | Normalized Palestinian mobile number |
-| `qr_data` | string | `ID: {reservationId} \| Trip: {route} \| Bus: {busName}` |
+| `qr_data` | string | JSON string: `{"id":"{reservationId}","trip":"{route}","bus":"{busName}"}` |
 | `status` | string | `waiting-boarding` (default) or `Boarded` |
 
 **App usage (`ReservationRepository.createBooking`):**
@@ -244,7 +244,7 @@ Student booking records. Document ID is used in `qr_data` for driver scanner che
   2. Creates `Reservation` + `Payment`
   3. Increments `Trips.total_passengers` by 1
 - Normalizes and validates Palestinian phone via [`PhoneNumberValidator`](lib/core/validation/phone_number_validator.dart)
-- Builds `qr_data` as `ID: {reservationId} | Trip: {route} | Bus: {busName}`
+- Builds `qr_data` as a JSON string via `jsonEncode` with `{ id, trip, bus }` (see [`ReservationQrDataCodec`](lib/core/reservation/reservation_qr_data_codec.dart))
 - After success, [`PaymentGatewayPage`](lib/features/student/presentation/pages/payment_gateway_page.dart) saves phone + reservation ID locally, calls `refreshStudentBrowseData()`, and invalidates `activeTicketsProvider`
 
 **Fetching reservations:** My Tickets loads docs by **stored reservation IDs** (individual `get` per ID, batched in groups of 10 for loop organization). Each reservation is joined with its trip, bus, route, and payment. `fetchActiveReservationsByIds` keeps only tickets whose linked trip is still `Waiting-Passengers` or `On-the-way`.

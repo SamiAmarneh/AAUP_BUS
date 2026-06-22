@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../core/auth/auth_exceptions.dart';
 import '../../../core/auth/firestore_collections.dart';
+import '../../../core/reservation/reservation_qr_data_codec.dart';
 import '../../../core/validation/phone_number_validator.dart';
 import '../../bus_company/data/bus_repository.dart';
 import '../../bus_company/data/route_repository.dart';
@@ -55,8 +56,11 @@ class ReservationRepository {
         .doc();
     final paymentRef = _firestore.collection(FirestoreCollections.payment).doc();
 
-    final qrData =
-        'ID: ${reservationRef.id} | Trip: ${trip.route} | Bus: ${trip.company}';
+    final qrData = ReservationQrDataCodec.encodeReservationQrData(
+      id: reservationRef.id,
+      trip: trip.route,
+      bus: trip.company,
+    );
 
     try {
       await _firestore.runTransaction((transaction) async {
