@@ -227,6 +227,27 @@ class TripRepository {
     return details;
   }
 
+  Future<List<TripDetails>> fetchActiveTripDetails() async {
+    final trips = await fetchAvailableTrips();
+    final details = <TripDetails>[];
+
+    for (final trip in trips) {
+      final route = await _routeRepository.fetchRouteById(trip.routeId);
+      final bus = await _busRepository.fetchBusById(trip.busId);
+
+      if (route == null || route.status != RouteStatus.active) {
+        continue;
+      }
+      if (bus == null || bus.status != BusStatus.active) {
+        continue;
+      }
+
+      details.add(TripDetails(trip: trip, bus: bus, route: route));
+    }
+
+    return details;
+  }
+
   Future<TripProfile> createTrip({
     required String driverUid,
     required String routeId,

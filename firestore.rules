@@ -137,6 +137,7 @@ service cloud.firestore {
     }
 
     match /bus_location/{locationId} {
+      allow read: if request.auth == null;
       allow read: if request.auth != null;
       allow create: if isDriver()
         && request.resource.data.bus_id is path

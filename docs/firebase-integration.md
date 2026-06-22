@@ -214,14 +214,14 @@ Append-only location pings while a driver has an active trip.
 
 **App usage:**
 
-- **Write only** from driver side
-- `BusLocationTrackingController` publishes every **5 seconds** while trip status is active
+- **Write** from driver side: `BusLocationTrackingController` publishes every **5 seconds** while trip status is active
+- **Read** from student side: [`LiveTrackingPage`](lib/features/student/presentation/pages/live_tracking_page.dart) polls latest ping per active-trip bus via `BusLocationRepository.fetchLatestLocationsForBuses`
 - Started automatically when driver dashboard loads (`AuthGate` watches `busLocationTrackingProvider`)
 - Uses device GPS (`geolocator`) after location permission is granted
 
-**Rules:** authenticated read; driver create only for their assigned bus; admin update/delete.
+**Student read query:** `bus_location` where `bus_id == buses/{id}` orderBy `timestamp` desc limit 1 (indexed). Pings older than **120 seconds** are treated as stale and hidden. Full buses (`total_passengers >= capacity`) are excluded from live tracking.
 
-**Not implemented:** no UI reads `bus_location` yet (student live map uses hardcoded mock data).
+**Rules:** authenticated read; guest read (student live tracking); driver create only for their assigned bus; admin update/delete.
 
 ---
 
@@ -286,6 +286,7 @@ Students have **no Firebase Auth** session. Public read is enabled via **separat
 | `Trips/{id}` | Documents where `status == 'Waiting-Passengers'` or `status == 'On-the-way'` |
 | `Reservation/{id}` | All documents (for My Tickets by stored reservation IDs) |
 | `Payment/{id}` | All documents (for ticket payment details) |
+| `bus_location/{id}` | All documents (latest ping per bus for student live map) |
 
 **Guest writes (booking):** unauthenticated users can create `Reservation` and `Payment` documents and increment `Trips.total_passengers` by exactly 1 on active trips (`Waiting-Passengers` or `On-the-way`), validated by `isGuestBookingUpdate()` in security rules. The app also re-validates trip status and capacity inside the booking transaction before writing.
 
@@ -306,6 +307,7 @@ firebase deploy --only firestore:rules,firestore:indexes
 - Buses by `driver_id` + `status`
 - Payment by `reservation_id`
 - Reservation by `phone_number` + `reservation_time` DESC (defined for future/optional phone-based lookup; My Tickets uses stored reservation IDs instead)
+- `bus_location` by `bus_id` + `timestamp` DESC (student live tracking: latest ping per bus)
 
 Trip history falls back to client-side sorting if the composite index is missing (`failed-precondition` with index hint).
 
@@ -342,7 +344,7 @@ Trip history falls back to client-side sorting if the composite index is missing
 |---------|---------------------|
 | Guest “login” | No — `SharedPreferences` only |
 | Browse trips | Yes — [`BrowseTripsPage`](lib/features/student/presentation/pages/browse_trips_page.dart) reads active `Trips`, `routes`, and `buses`; **excludes `Arrived` and full buses**; route filter chips; **5s poll**; **pull-to-refresh**, header refresh button, and error retry via `refreshStudentBrowseData()` |
-| Live bus tracking map | No — hardcoded mock buses |
+| Live bus tracking map | Yes — [`LiveTrackingPage`](lib/features/student/presentation/pages/live_tracking_page.dart) reads active bookable `Trips` + latest `bus_location` per bus; **sorted nearest-first** using user GPS; distance shown from user; tap bus → [`TripDetailsPage`](lib/features/student/presentation/pages/trip_details_page.dart); map marker tap focuses bus; **full buses hidden**; **5s poll**; pull-to-refresh + header sync |
 | Trip details → booking | Yes — [`TripDetailsPage`](lib/features/student/presentation/pages/trip_details_page.dart) → [`PhoneEntryPage`](lib/features/student/presentation/pages/phone_entry_page.dart) → [`PaymentGatewayPage`](lib/features/student/presentation/pages/payment_gateway_page.dart) |
 | Reservations / payments | Yes — phone entry → fake payment → Firestore transaction (`Reservation`, `Payment`, `Trips.total_passengers`); refreshes browse list + tickets after booking |
 | My Tickets | Yes — [`MyTicketsPage`](lib/features/student/presentation/pages/my_tickets_page.dart); loads local reservation IDs; shows only tickets for **active** trips; 5s poll; pull-to-refresh + refresh on page open |
@@ -374,6 +376,7 @@ lib/
 │   │   ├── reservation_repository.dart      # Booking transaction + reservation joins
 │   │   ├── reservation_providers.dart       # reservationRepositoryProvider, local storage
 │   │   ├── student_reservation_providers.dart  # activeTicketsProvider, refreshActiveTickets()
+│   │   ├── student_live_tracking_providers.dart  # studentTrackedBusesProvider, refreshStudentLiveTracking()
 │   │   └── student_booking_local_storage.dart  # StudentBookingStorageKeys
 │   ├── domain/
 │   │   ├── models/trip_model.dart           # Trip UI adapter (Trip.fromTripDetails)
@@ -389,19 +392,26 @@ lib/
 │       ├── payment_gateway_page.dart        # Fake/demo checkout
 │       ├── booking_confirmation_page.dart
 │       ├── my_tickets_page.dart
+│       ├── live_tracking_page.dart
 │       └── ticket_details_page.dart
 ├── core/validation/
 │   └── phone_number_validator.dart          # Palestinian phone validation
 ├── features/trips/
 │   ├── data/
-│   │   ├── trip_repository.dart             # fetchAvailableTrips, fetchAvailableTripDetails
+│   │   ├── trip_repository.dart             # fetchAvailableTrips, fetchAvailableTripDetails, fetchActiveTripDetails
 │   │   └── trip_providers.dart              # tripRepositoryProvider, driver active trip streams
 │   └── domain/
 │       ├── trip_profile.dart                # Firestore trip model; defaultTotalPassengers = 0
 │       └── trip_details.dart                # Trip + route + bus join; hasAvailableSeats
-└── features/tracking/data/
-    ├── bus_location_repository.dart
-    └── bus_location_tracking_controller.dart
+└── features/tracking/
+    ├── data/
+    │   ├── bus_location_repository.dart     # publish + fetch latest location per bus
+    │   ├── bus_location_providers.dart
+    │   └── bus_location_tracking_controller.dart
+    └── domain/
+        ├── bus_location_constants.dart
+        ├── bus_location_profile.dart
+        └── tracked_bus_details.dart
 ```
 
 State management uses **flutter_riverpod**. Repositories talk to Firestore/Auth; UI pages watch `StreamProvider` / `FutureProvider` instances.
@@ -418,6 +428,8 @@ State management uses **flutter_riverpod**. Repositories talk to Firestore/Auth;
 | `studentBookingLocalStorageProvider` | `Provider` | `SharedPreferences` wrapper for phones + reservation IDs |
 | `activeTicketsProvider` | `StreamProvider` | Polls `fetchActiveReservationsByIds` from local reservation IDs every 5s |
 | `refreshActiveTickets()` | `Future<void>` | Invalidates active tickets provider (used on My Tickets open + pull-to-refresh) |
+| `studentTrackedBusesProvider` | `StreamProvider` | Polls active trips + latest `bus_location` per bus every 5s; excludes full buses and stale pings; UI sorts by user distance |
+| `refreshStudentLiveTracking()` | `Future<void>` | Invalidates live tracking provider (pull-to-refresh, header sync, error retry) |
 
 ### Student local storage (booking)
 
@@ -530,15 +542,39 @@ sequenceDiagram
   PayPage->>Student: BookingConfirmationPage with QR
 ```
 
+### Student live tracking
+
+```mermaid
+sequenceDiagram
+  participant Student
+  participant Page as LiveTrackingPage
+  participant Provider as studentTrackedBusesProvider
+  participant TripRepo as TripRepository
+  participant LocRepo as BusLocationRepository
+  participant FS as Firestore
+
+  Student->>Page: Open Live Tracking
+  Page->>Provider: watch stream
+  loop Every 5s
+    Provider->>TripRepo: fetchActiveTripDetails
+    TripRepo->>FS: Trips where status active + join routes/buses
+    Provider->>LocRepo: fetchLatestLocationsForBuses
+    LocRepo->>FS: bus_location where bus_id orderBy timestamp desc limit 1
+    Note over Provider: Keep trips with ping within 60s
+    Provider-->>Page: TrackedBusDetails list + map markers
+  end
+  Student->>Page: Pull-to-refresh or tap sync
+  Page->>Provider: refreshStudentLiveTracking
+```
+
 ---
 
 ## What is not connected yet (gaps)
 
-1. **Student live tracking** — no consumption of `bus_location` yet (student map is mock data).
-2. **Real payment gateway** — student checkout uses a fake/demo payment page; no PayPal/Apple Pay backend.
-3. **Driver scanner → Firestore** — driver QR scan does not yet update `Reservation.status` to `Boarded`.
-4. **Non-Android platforms** — Firebase not initialized on iOS/web/desktop in current code.
-5. **Firebase Storage, FCM, Analytics** — not used.
+1. **Real payment gateway** — student checkout uses a fake/demo payment page; no PayPal/Apple Pay backend.
+2. **Driver scanner → Firestore** — driver QR scan does not yet update `Reservation.status` to `Boarded`.
+3. **Non-Android platforms** — Firebase not initialized on iOS/web/desktop in current code.
+4. **Firebase Storage, FCM, Analytics** — not used.
 
 ---
 
@@ -546,7 +582,7 @@ sequenceDiagram
 
 1. **Admin accounts** — create user in Firebase Auth, then add document `admins/{uid}` with `email` and optional `name`.
 2. **Driver accounts** — prefer creating via admin “Manage Drivers” UI (creates Auth + Firestore together).
-3. **Deploy rules/indexes** — required for student browse and booking (guest reads/writes). From project root:
+3. **Deploy rules/indexes** — required for student browse, booking, and live tracking (guest reads/writes). From project root:
    ```bash
    firebase deploy --only firestore:rules,firestore:indexes
    ```
@@ -574,6 +610,8 @@ sequenceDiagram
 | `lib/features/student/domain/models/trip_model.dart` | UI `Trip` adapter from `TripDetails` (seat counts for cards) |
 | `lib/features/student/data/reservation_repository.dart` | Booking transaction + reservation/payment joins |
 | `lib/features/student/data/student_reservation_providers.dart` | `activeTicketsProvider`, `refreshActiveTickets()` |
+| `lib/features/student/data/student_live_tracking_providers.dart` | `studentTrackedBusesProvider`, `refreshStudentLiveTracking()` |
+| `lib/features/student/presentation/pages/live_tracking_page.dart` | Student live map + bus list from `bus_location` |
 | `lib/features/student/data/student_booking_local_storage.dart` | Local phone + reservation ID persistence |
 | `lib/features/student/presentation/pages/my_tickets_page.dart` | Active tickets list (active trips only) |
 | `lib/features/student/presentation/pages/payment_gateway_page.dart` | Demo checkout; triggers Firestore booking |
