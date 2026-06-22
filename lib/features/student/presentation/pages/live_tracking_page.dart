@@ -10,6 +10,7 @@ import '../../../trips/domain/trip_status.dart';
 import '../../data/student_live_tracking_providers.dart';
 import '../../domain/models/trip_model.dart';
 import '../utils/geo_distance_formatter.dart';
+import 'live_tracking_expanded_map_page.dart';
 import 'trip_details_page.dart';
 
 class LiveTrackingPage extends ConsumerStatefulWidget {
@@ -22,7 +23,11 @@ class LiveTrackingPage extends ConsumerStatefulWidget {
 class _LiveTrackingPageState extends ConsumerState<LiveTrackingPage> {
   static const LatLng _defaultMapCenter = LatLng(31.9495, 35.9329);
   static const double _busFocusZoom = 14;
+  static const double _userFocusZoom = 15;
   static const double _mapBoundsPadding = 48;
+  static const double _minimumBoundsSpanDegrees = 0.01;
+  static const double _maxUserBusFitDistanceMeters =
+      GeoDistanceFormatter.maxReliableDistanceMeters;
   static const int _secondsPerMinute = 60;
   static const int _minutesPerHour = 60;
   static const int _hoursPerDay = 24;
@@ -34,6 +39,8 @@ class _LiveTrackingPageState extends ConsumerState<LiveTrackingPage> {
   LatLng? _userPosition;
   bool _locationPermissionGranted = false;
   bool _hasInitialCameraFit = false;
+  bool _hasCenteredMapOnUser = false;
+  CameraPosition? _inlineMapInitialCamera;
   String? _selectedBusId;
 
   @override
@@ -80,8 +87,12 @@ class _LiveTrackingPageState extends ConsumerState<LiveTrackingPage> {
     setState(() {
       _locationPermissionGranted = isGranted && position != null;
       _userPosition = position;
-      _hasInitialCameraFit = false;
     });
+
+    if (position != null && !_hasCenteredMapOnUser) {
+      _hasCenteredMapOnUser = true;
+      _centerMapOnPosition(position, animate: false);
+    }
   }
 
   Future<void> _handleRefresh() async {
@@ -106,6 +117,44 @@ class _LiveTrackingPageState extends ConsumerState<LiveTrackingPage> {
     return _busCardKeys.putIfAbsent(busId, GlobalKey.new);
   }
 
+  Future<void> _openExpandedMap(List<TrackedBusDetails> trackedBuses) async {
+    if (trackedBuses.isEmpty) {
+      return;
+    }
+
+    final selectedBusId = await Navigator.push<String?>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => LiveTrackingExpandedMapPage(
+          trackedBuses: trackedBuses,
+          userPosition: _userPosition,
+          locationPermissionGranted: _locationPermissionGranted,
+          initialSelectedBusId:
+              _selectedBusId ?? trackedBuses.first.tripDetails.bus.id,
+        ),
+      ),
+    );
+
+    if (!mounted || selectedBusId == null) {
+      return;
+    }
+
+    setState(() => _selectedBusId = selectedBusId);
+
+    TrackedBusDetails? selectedBus;
+    for (final trackedBus in trackedBuses) {
+      if (trackedBus.tripDetails.bus.id == selectedBusId) {
+        selectedBus = trackedBus;
+        break;
+      }
+    }
+
+    if (selectedBus != null) {
+      _focusMapOnBus(selectedBus);
+      _scrollToBusCard(selectedBusId);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final trackedBusesAsync = ref.watch(studentTrackedBusesProvider);
@@ -114,7 +163,9 @@ class _LiveTrackingPageState extends ConsumerState<LiveTrackingPage> {
       studentTrackedBusesProvider,
       (previous, next) {
         next.whenData((trackedBuses) {
-          if (_hasInitialCameraFit || trackedBuses.isEmpty) {
+          if (_hasInitialCameraFit ||
+              trackedBuses.isEmpty ||
+              _userPosition != null) {
             return;
           }
           _hasInitialCameraFit = true;
@@ -135,10 +186,8 @@ class _LiveTrackingPageState extends ConsumerState<LiveTrackingPage> {
             _buildHeader(context),
             Expanded(
               child: trackedBusesAsync.when(
-                data: (trackedBuses) => RefreshIndicator(
-                  onRefresh: _handleRefresh,
-                  child: _buildContent(_sortedBuses(trackedBuses)),
-                ),
+                data: (trackedBuses) =>
+                    _buildContent(_sortedBuses(trackedBuses)),
                 loading: () => const Center(child: CircularProgressIndicator()),
                 error: (_, __) => Center(
                   child: Padding(
@@ -220,145 +269,145 @@ class _LiveTrackingPageState extends ConsumerState<LiveTrackingPage> {
 
   Widget _buildContent(List<TrackedBusDetails> trackedBuses) {
     final markers = _buildMarkers(trackedBuses);
+    final polylines = _buildRoutePolylines(trackedBuses);
+    final initialTarget = _userPosition ??
+        (trackedBuses.isNotEmpty
+            ? LatLng(
+                trackedBuses.first.location.latitude,
+                trackedBuses.first.location.longitude,
+              )
+            : _defaultMapCenter);
+    final initialZoom = _userPosition != null
+        ? _userFocusZoom
+        : (trackedBuses.isNotEmpty ? _busFocusZoom : 10.0);
+    _inlineMapInitialCamera ??= CameraPosition(
+      target: initialTarget,
+      zoom: initialZoom,
+    );
 
-    return ListView(
-      controller: _listScrollController,
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+    return Column(
       children: [
-        if (!_locationPermissionGranted) _buildLocationBanner(),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.08),
-                blurRadius: 18,
-                offset: const Offset(0, 10),
-              ),
-            ],
+        Expanded(
+          flex: 2,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
+            child: _LiveTrackingInlineMapPanel(
+              key: const ValueKey('live_tracking_map_section'),
+              initialCamera: _inlineMapInitialCamera!,
+              markers: markers,
+              polylines: polylines,
+              locationPermissionGranted: _locationPermissionGranted,
+              onMapCreated: _onInlineMapCreated,
+              onExpand: () => _openExpandedMap(trackedBuses),
+              onCenterUser: _centerMapOnUser,
+            ),
           ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(24),
-            child: SizedBox(
-              height: 260,
-              child: Stack(
-                children: [
-                  GoogleMap(
-                    initialCameraPosition: CameraPosition(
-                      target: _userPosition ?? _defaultMapCenter,
-                      zoom: 10,
-                    ),
-                    mapType: MapType.normal,
-                    markers: markers,
-                    zoomControlsEnabled: false,
-                    myLocationEnabled: _locationPermissionGranted,
-                    myLocationButtonEnabled: false,
-                    compassEnabled: true,
-                    rotateGesturesEnabled: true,
-                    tiltGesturesEnabled: true,
-                    scrollGesturesEnabled: true,
-                    onMapCreated: (controller) {
-                      _mapController = controller;
-                      _fitMapToMarkers(trackedBuses);
-                    },
-                  ),
-                  Positioned(
-                    top: 18,
-                    left: 18,
-                    child: GestureDetector(
-                      onTap: _centerMapOnUser,
-                      child: Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.9),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.navigation,
-                          color: _locationPermissionGranted
-                              ? const Color(0xFF00C853)
-                              : const Color(0xFF8E8E93),
-                          size: 24,
-                        ),
+        ),
+        Expanded(
+          flex: 3,
+          child: RefreshIndicator(
+            onRefresh: _handleRefresh,
+            child: ListView(
+              controller: _listScrollController,
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+              children: [
+                if (!_locationPermissionGranted) _buildLocationBanner(),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Nearby Buses',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
+                    Text(
+                      '${trackedBuses.length} active',
+                      style: const TextStyle(
+                        color: Color(0xFF8E8E93),
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                if (trackedBuses.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: const Text(
+                      'No buses are currently broadcasting location.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Color(0xFF6C7A93), fontSize: 14),
+                    ),
+                  )
+                else
+                  ...trackedBuses.map(_buildBusCard),
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(18),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 14,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 24),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Nearby Buses',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            Text(
-              '${trackedBuses.length} active',
-              style: const TextStyle(color: Color(0xFF8E8E93), fontSize: 13),
-            ),
-          ],
-        ),
-        const SizedBox(height: 14),
-        if (trackedBuses.isEmpty)
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: const Text(
-              'No buses are currently broadcasting location.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Color(0xFF6C7A93), fontSize: 14),
-            ),
-          )
-        else
-          ...trackedBuses.map(_buildBusCard),
-        const SizedBox(height: 14),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 14,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(
-                Icons.info_outline,
-                color: Color(0xFF007AFF),
-                size: 22,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'Tracking updates every ${BusLocationConstants.publishIntervalSeconds} seconds. '
-                  'Tap a bus to book. Full buses are hidden.',
-                  style: const TextStyle(
-                    color: Color(0xFF6C7A93),
-                    fontSize: 13,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(
+                        Icons.info_outline,
+                        color: Color(0xFF007AFF),
+                        size: 22,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Tracking updates every ${BusLocationConstants.publishIntervalSeconds} seconds. '
+                          'Tap a bus to book. Full buses are hidden.',
+                          style: const TextStyle(
+                            color: Color(0xFF6C7A93),
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ],
     );
+  }
+
+  void _onInlineMapCreated(GoogleMapController controller) {
+    _mapController = controller;
+
+    if (_userPosition != null) {
+      _hasCenteredMapOnUser = true;
+      _centerMapOnPosition(_userPosition!, animate: false);
+      return;
+    }
+
+    final trackedBuses = ref.read(studentTrackedBusesProvider).value;
+    if (trackedBuses == null || trackedBuses.isEmpty) {
+      return;
+    }
+
+    _hasInitialCameraFit = true;
+    _fitMapToMarkers(_sortedBuses(trackedBuses));
   }
 
   Widget _buildLocationBanner() {
@@ -390,7 +439,7 @@ class _LiveTrackingPageState extends ConsumerState<LiveTrackingPage> {
   }
 
   Set<Marker> _buildMarkers(List<TrackedBusDetails> trackedBuses) {
-    return trackedBuses
+    final busMarkers = trackedBuses
         .map(
           (trackedBus) {
             final busId = trackedBus.tripDetails.bus.id;
@@ -416,6 +465,39 @@ class _LiveTrackingPageState extends ConsumerState<LiveTrackingPage> {
           },
         )
         .toSet();
+
+    if (_userPosition == null) {
+      return busMarkers;
+    }
+
+    return {
+      Marker(
+        markerId: const MarkerId('current_location'),
+        position: _userPosition!,
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+        infoWindow: const InfoWindow(title: 'Your location'),
+      ),
+      ...busMarkers,
+    };
+  }
+
+  Set<Polyline> _buildRoutePolylines(List<TrackedBusDetails> trackedBuses) {
+    if (_userPosition == null) {
+      return {};
+    }
+
+    return trackedBuses.map((trackedBus) {
+      final busId = trackedBus.tripDetails.bus.id;
+      return Polyline(
+        polylineId: PolylineId('route_to_$busId'),
+        points: [
+          _userPosition!,
+          LatLng(trackedBus.location.latitude, trackedBus.location.longitude),
+        ],
+        color: const Color(0xFF00C853),
+        width: 4,
+      );
+    }).toSet();
   }
 
   void _selectBusOnMap(TrackedBusDetails trackedBus) {
@@ -425,13 +507,19 @@ class _LiveTrackingPageState extends ConsumerState<LiveTrackingPage> {
     _scrollToBusCard(busId);
   }
 
-  void _focusMapOnBus(TrackedBusDetails trackedBus) {
-    _mapController?.animateCamera(
-      CameraUpdate.newLatLngZoom(
-        LatLng(trackedBus.location.latitude, trackedBus.location.longitude),
-        _busFocusZoom,
-      ),
+  void _focusMapOnBus(
+    TrackedBusDetails trackedBus, {
+    bool animate = true,
+  }) {
+    final cameraUpdate = CameraUpdate.newLatLngZoom(
+      LatLng(trackedBus.location.latitude, trackedBus.location.longitude),
+      _busFocusZoom,
     );
+    if (animate) {
+      _mapController?.animateCamera(cameraUpdate);
+      return;
+    }
+    _mapController?.moveCamera(cameraUpdate);
   }
 
   void _scrollToBusCard(String busId) {
@@ -450,13 +538,23 @@ class _LiveTrackingPageState extends ConsumerState<LiveTrackingPage> {
   }
 
   void _centerMapOnUser() {
-    if (_userPosition == null || _mapController == null) {
+    if (_userPosition == null) {
       return;
     }
 
-    _mapController?.animateCamera(
-      CameraUpdate.newLatLngZoom(_userPosition!, _busFocusZoom),
-    );
+    _centerMapOnPosition(_userPosition!);
+  }
+
+  void _centerMapOnPosition(
+    LatLng position, {
+    bool animate = true,
+  }) {
+    final cameraUpdate = CameraUpdate.newLatLngZoom(position, _userFocusZoom);
+    if (animate) {
+      _mapController?.animateCamera(cameraUpdate);
+      return;
+    }
+    _mapController?.moveCamera(cameraUpdate);
   }
 
   void _fitMapToMarkers(List<TrackedBusDetails> trackedBuses) {
@@ -464,14 +562,65 @@ class _LiveTrackingPageState extends ConsumerState<LiveTrackingPage> {
       return;
     }
 
-    if (trackedBuses.length == 1 && _userPosition == null) {
-      _focusMapOnBus(trackedBuses.first);
+    if (trackedBuses.length == 1) {
+      _focusMapOnBus(trackedBuses.first, animate: false);
       return;
     }
 
     final bounds = _calculateBounds(trackedBuses);
-    _mapController?.animateCamera(
+    if (_isDegenerateBounds(bounds)) {
+      _focusMapOnBus(trackedBuses.first, animate: false);
+      return;
+    }
+
+    _mapController?.moveCamera(
       CameraUpdate.newLatLngBounds(bounds, _mapBoundsPadding),
+    );
+  }
+
+  bool _shouldIncludeUserInBounds(List<TrackedBusDetails> trackedBuses) {
+    if (_userPosition == null) {
+      return false;
+    }
+
+    for (final trackedBus in trackedBuses) {
+      final distanceMeters = Geolocator.distanceBetween(
+        _userPosition!.latitude,
+        _userPosition!.longitude,
+        trackedBus.location.latitude,
+        trackedBus.location.longitude,
+      );
+      if (distanceMeters <= _maxUserBusFitDistanceMeters) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  bool _isDegenerateBounds(LatLngBounds bounds) {
+    const epsilon = 0.0001;
+    final latSpan =
+        (bounds.northeast.latitude - bounds.southwest.latitude).abs();
+    final lngSpan =
+        (bounds.northeast.longitude - bounds.southwest.longitude).abs();
+    return latSpan < epsilon && lngSpan < epsilon;
+  }
+
+  LatLngBounds _expandBoundsIfNeeded(LatLngBounds bounds) {
+    if (!_isDegenerateBounds(bounds)) {
+      return bounds;
+    }
+
+    final centerLat =
+        (bounds.northeast.latitude + bounds.southwest.latitude) / 2;
+    final centerLng =
+        (bounds.northeast.longitude + bounds.southwest.longitude) / 2;
+    final halfSpan = _minimumBoundsSpanDegrees / 2;
+
+    return LatLngBounds(
+      southwest: LatLng(centerLat - halfSpan, centerLng - halfSpan),
+      northeast: LatLng(centerLat + halfSpan, centerLng + halfSpan),
     );
   }
 
@@ -485,7 +634,7 @@ class _LiveTrackingPageState extends ConsumerState<LiveTrackingPage> {
         )
         .toList();
 
-    if (_userPosition != null) {
+    if (_shouldIncludeUserInBounds(trackedBuses)) {
       points.add(_userPosition!);
     }
 
@@ -501,9 +650,11 @@ class _LiveTrackingPageState extends ConsumerState<LiveTrackingPage> {
       maxLng = maxLng > point.longitude ? maxLng : point.longitude;
     }
 
-    return LatLngBounds(
-      southwest: LatLng(minLat, minLng),
-      northeast: LatLng(maxLat, maxLng),
+    return _expandBoundsIfNeeded(
+      LatLngBounds(
+        southwest: LatLng(minLat, minLng),
+        northeast: LatLng(maxLat, maxLng),
+      ),
     );
   }
 
@@ -528,11 +679,10 @@ class _LiveTrackingPageState extends ConsumerState<LiveTrackingPage> {
       return 'Distance unavailable';
     }
 
-    final distanceMeters = GeoDistanceFormatter.distanceMetersFromUser(
+    return GeoDistanceFormatter.formatAwayLabelFromUser(
       userPosition: _userPosition!,
       trackedBus: trackedBus,
     );
-    return GeoDistanceFormatter.formatAwayLabel(distanceMeters);
   }
 
   String _formatUpdatedAgo(DateTime timestamp) {
@@ -654,6 +804,107 @@ class _LiveTrackingPageState extends ConsumerState<LiveTrackingPage> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _LiveTrackingInlineMapPanel extends StatefulWidget {
+  const _LiveTrackingInlineMapPanel({
+    super.key,
+    required this.initialCamera,
+    required this.markers,
+    required this.polylines,
+    required this.locationPermissionGranted,
+    required this.onMapCreated,
+    required this.onExpand,
+    required this.onCenterUser,
+  });
+
+  final CameraPosition initialCamera;
+  final Set<Marker> markers;
+  final Set<Polyline> polylines;
+  final bool locationPermissionGranted;
+  final ValueChanged<GoogleMapController> onMapCreated;
+  final VoidCallback onExpand;
+  final VoidCallback onCenterUser;
+
+  @override
+  State<_LiveTrackingInlineMapPanel> createState() =>
+      _LiveTrackingInlineMapPanelState();
+}
+
+class _LiveTrackingInlineMapPanelState extends State<_LiveTrackingInlineMapPanel> {
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          GoogleMap(
+            initialCameraPosition: widget.initialCamera,
+            mapType: MapType.normal,
+            markers: widget.markers,
+            polylines: widget.polylines,
+            zoomControlsEnabled: false,
+            myLocationEnabled: false,
+            myLocationButtonEnabled: false,
+            compassEnabled: true,
+            onMapCreated: widget.onMapCreated,
+          ),
+          Positioned(
+            top: 18,
+            right: 18,
+            child: GestureDetector(
+              onTap: widget.onExpand,
+              child: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.9),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.fullscreen,
+                  color: Color(0xFF456CFF),
+                  size: 22,
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 18,
+            left: 18,
+            child: GestureDetector(
+              onTap: widget.onCenterUser,
+              child: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.9),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.navigation,
+                  color: widget.locationPermissionGranted
+                      ? const Color(0xFF00C853)
+                      : const Color(0xFF8E8E93),
+                  size: 24,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

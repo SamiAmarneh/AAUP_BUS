@@ -6,6 +6,8 @@ import '../../../tracking/domain/tracked_bus_details.dart';
 abstract final class GeoDistanceFormatter {
   static const double metersPerKilometer = 1000;
   static const int metersPerKilometerThreshold = 1000;
+  // Beyond this, user GPS is likely wrong (e.g. emulator default in another region).
+  static const double maxReliableDistanceMeters = 500000;
 
   static double distanceMetersFromUser({
     required LatLng userPosition,
@@ -17,6 +19,24 @@ abstract final class GeoDistanceFormatter {
       trackedBus.location.latitude,
       trackedBus.location.longitude,
     );
+  }
+
+  static bool isReliableDistance(double distanceMeters) {
+    return distanceMeters <= maxReliableDistanceMeters;
+  }
+
+  static String formatAwayLabelFromUser({
+    required LatLng userPosition,
+    required TrackedBusDetails trackedBus,
+  }) {
+    final distanceMeters = distanceMetersFromUser(
+      userPosition: userPosition,
+      trackedBus: trackedBus,
+    );
+    if (!isReliableDistance(distanceMeters)) {
+      return 'Distance unavailable';
+    }
+    return formatAwayLabel(distanceMeters);
   }
 
   static String formatAwayLabel(double distanceMeters) {
