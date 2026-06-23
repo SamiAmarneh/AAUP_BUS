@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/auth/auth_actions.dart';
 import '../../../../core/auth/auth_providers.dart';
+import '../../data/admin_dashboard_providers.dart';
+import '../../data/bus_providers.dart';
 import 'route_management_page.dart';
 import 'trips_management_page.dart';
 import 'bus_management_page.dart';
@@ -35,6 +37,26 @@ class AdminDashboardPage extends ConsumerWidget {
             body: Center(child: CircularProgressIndicator()),
           );
         }
+
+        final activeTripsCount = ref.watch(adminActiveTripsCountProvider);
+        final activeBusesAsync = ref.watch(activeBusesProvider);
+        final bookingsTodayCount = ref.watch(adminBookingsTodayCountProvider);
+
+        final activeTripsValue = activeTripsCount.when(
+          data: (count) => count.toString(),
+          loading: () => '—',
+          error: (_, __) => '0',
+        );
+        final activeBusesValue = activeBusesAsync.when(
+          data: (buses) => buses.length.toString(),
+          loading: () => '—',
+          error: (_, __) => '0',
+        );
+        final bookingsTodayValue = bookingsTodayCount.when(
+          data: (count) => count.toString(),
+          loading: () => '—',
+          error: (_, __) => '0',
+        );
 
         return Scaffold(
           backgroundColor: Colors.white,
@@ -83,15 +105,15 @@ class AdminDashboardPage extends ConsumerWidget {
                     const SizedBox(height: 30),
                     Row(
                       children: [
-                        _buildStatCard('Active Trips', '5'),
+                        _buildStatCard('Active Trips', activeTripsValue),
                         const SizedBox(width: 15),
-                        _buildStatCard('Active Buses', '8'),
+                        _buildStatCard('Active Buses', activeBusesValue),
                       ],
                     ),
                     const SizedBox(height: 15),
                     Row(
                       children: [
-                        _buildStatCard('Bookings Today', '42'),
+                        _buildStatCard('Bookings Today', bookingsTodayValue),
                         const SizedBox(width: 15),
                         const Expanded(child: SizedBox()),
                       ],

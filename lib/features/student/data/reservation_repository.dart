@@ -197,6 +197,24 @@ class ReservationRepository {
         .toList();
   }
 
+  Future<int> countBookingsToday() async {
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day);
+    final startOfNextDay = startOfDay.add(const Duration(days: 1));
+
+    try {
+      final snapshot = await _firestore
+          .collection(FirestoreCollections.reservation)
+          .where('reservation_time', isGreaterThanOrEqualTo: startOfDay)
+          .where('reservation_time', isLessThan: startOfNextDay)
+          .get();
+
+      return snapshot.docs.length;
+    } on FirebaseException catch (exception) {
+      throw mapFirestoreException(exception);
+    }
+  }
+
   Future<List<ReservationDetails>> _fetchReservationBatch(
     List<String> ids,
   ) async {
