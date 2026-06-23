@@ -58,6 +58,8 @@ const AuthFailure unauthorizedFailure = AuthFailure(
   'Account not authorized. Contact your administrator.',
 );
 
+const String loginFailedMessage = 'Login failed. Please try again.';
+
 AuthFailure roleMismatchFailure(UserRole expectedRole) {
   return switch (expectedRole) {
     UserRole.admin => const AuthFailure(

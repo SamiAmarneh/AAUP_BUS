@@ -16,10 +16,12 @@ class AuthGate extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authStateProvider);
+    ref.watch(signInSessionTickProvider);
+    final isSignInInProgress = ref.read(authRepositoryProvider).isSignInInProgress;
 
     return authState.when(
       data: (user) {
-        if (user == null) {
+        if (user == null || isSignInInProgress) {
           return const _UnauthenticatedHome();
         }
         return const _AuthenticatedHome();

@@ -42,13 +42,9 @@ class _DriverLoginPageState extends ConsumerState<DriverLoginPage> {
         return;
       }
       Navigator.of(context).popUntil((route) => route.isFirst);
-    } on AuthFailure catch (failure) {
-      if (mounted) {
-        setState(() => _errorMessage = failure.message);
-      }
     } catch (_) {
       if (mounted) {
-        setState(() => _errorMessage = 'Login failed. Please try again.');
+        setState(() => _errorMessage = loginFailedMessage);
       }
     } finally {
       if (mounted) {

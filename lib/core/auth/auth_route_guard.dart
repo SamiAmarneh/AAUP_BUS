@@ -4,15 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'auth_providers.dart';
 
 class AuthLoginRouteGuard extends ConsumerStatefulWidget {
-  const AuthLoginRouteGuard({
-    super.key,
-    required this.child,
-  });
+  const AuthLoginRouteGuard({super.key, required this.child});
 
   final Widget child;
 
   @override
-  ConsumerState<AuthLoginRouteGuard> createState() => _AuthLoginRouteGuardState();
+  ConsumerState<AuthLoginRouteGuard> createState() =>
+      _AuthLoginRouteGuardState();
 }
 
 class _AuthLoginRouteGuardState extends ConsumerState<AuthLoginRouteGuard> {
@@ -34,10 +32,12 @@ class _AuthLoginRouteGuardState extends ConsumerState<AuthLoginRouteGuard> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authStateProvider);
+    ref.watch(signInSessionTickProvider);
+    final isSignInInProgress = ref.read(authRepositoryProvider).isSignInInProgress;
 
     return authState.when(
       data: (user) {
-        if (user != null) {
+        if (user != null && !isSignInInProgress) {
           _redirectAuthenticatedUser();
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
@@ -45,9 +45,8 @@ class _AuthLoginRouteGuardState extends ConsumerState<AuthLoginRouteGuard> {
         }
         return widget.child;
       },
-      loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      ),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (_, __) => widget.child,
     );
   }
