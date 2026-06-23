@@ -115,6 +115,20 @@ service cloud.firestore {
         && request.resource.data.payment_time == request.time;
     }
 
+    function isDriverFcmTokenUpdate() {
+      return isDriver()
+        && request.auth.uid == driverId
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['fcm_token', 'fcm_token_updated_at'])
+        && request.resource.data.fcm_token is string
+        && request.resource.data.fcm_token.size() > 0
+        && request.resource.data.fcm_token_updated_at == request.time
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.name == resource.data.name
+        && request.resource.data.phone_number == resource.data.phone_number
+        && request.resource.data.status == resource.data.status;
+    }
+
     match /admins/{adminId} {
       allow read: if request.auth != null && request.auth.uid == adminId;
       allow write: if isAdmin();
@@ -123,7 +137,8 @@ service cloud.firestore {
     match /drivers/{driverId} {
       allow read: if request.auth != null
         && (request.auth.uid == driverId || isAdmin());
-      allow create, update, delete: if isAdmin();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || isDriverFcmTokenUpdate();
     }
 
     match /buses/{id} {

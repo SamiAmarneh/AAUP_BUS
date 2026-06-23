@@ -105,6 +105,25 @@ class DriverRepository {
     }
   }
 
+  Future<void> saveFcmToken({
+    required String driverUid,
+    required String token,
+  }) async {
+    final trimmedToken = token.trim();
+    if (driverUid.trim().isEmpty || trimmedToken.isEmpty) {
+      return;
+    }
+
+    try {
+      await _firestore.collection(FirestoreCollections.drivers).doc(driverUid).update({
+        'fcm_token': trimmedToken,
+        'fcm_token_updated_at': FieldValue.serverTimestamp(),
+      });
+    } on FirebaseException catch (exception) {
+      throw mapFirestoreException(exception);
+    }
+  }
+
   Future<FirebaseAuth> _getSecondaryAuth() async {
     if (_secondaryAuth != null) {
       return _secondaryAuth!;

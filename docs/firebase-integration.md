@@ -13,7 +13,7 @@ The app uses **Firebase Authentication** and **Cloud Firestore** for admin (bus 
 | Firebase Auth | Yes | Admin & driver email/password login, password reset, driver account creation |
 | Cloud Firestore | Yes | Profiles, buses, routes, trips, live bus location writes |
 | Firebase Storage | No | Configured in project options only; not used in app code |
-| Cloud Messaging | No | Not integrated |
+| Cloud Messaging | Yes (driver) | Push alerts when a student books; FCM token on `drivers/{uid}`; Cloud Function `notifyDriverOnBooking` |
 | Firebase Analytics | No | Not integrated |
 
 **Firebase project:** `aaup-bus-tracking` (see `.firebaserc`)
@@ -35,6 +35,8 @@ Dependencies in `pubspec.yaml`:
 - `firebase_core`
 - `firebase_auth`
 - `cloud_firestore`
+- `firebase_messaging` (driver push notifications)
+- `flutter_local_notifications` (foreground notification display on Android)
 
 ---
 
@@ -104,14 +106,17 @@ Driver profile. Document ID = Firebase Auth UID.
 | `name` | string | |
 | `phone_number` | string | |
 | `status` | string | `active` or `inactive` |
+| `fcm_token` | string | Optional. Latest FCM device token (written by driver app on login) |
+| `fcm_token_updated_at` | timestamp | Optional. Last FCM token sync time |
 
 **App usage:**
 
 - Read on driver login and admin driver list
 - Admin creates driver (Auth user + Firestore doc)
 - Admin deactivates driver (`status: inactive`)
+- Driver app syncs `fcm_token` on login via `DriverRepository.saveFcmToken()` (driver may update only these two fields)
 
-**Rules:** driver reads own doc; admin reads/writes all driver docs.
+**Rules:** driver reads own doc; driver may update own `fcm_token` + `fcm_token_updated_at` only; admin reads/writes all other driver fields.
 
 ---
 
@@ -331,6 +336,7 @@ firebase deploy --only firestore:rules,firestore:indexes
 - Buses by `driver_id` + `status`
 - Payment by `reservation_id`
 - Reservation by `phone_number` + `reservation_time` DESC (defined for future/optional phone-based lookup; My Tickets uses stored reservation IDs instead)
+- Reservation by `trip_id` + `reservation_time` DESC (driver dashboard passenger list)
 - `bus_location` by `bus_id` + `timestamp` DESC (student live tracking: latest ping per bus)
 
 Trip history falls back to client-side sorting if the composite index is missing (`failed-precondition` with index hint).
@@ -360,6 +366,8 @@ Trip history falls back to client-side sorting if the composite index is missing
 | Create / start / complete trip | Yes — `Trips` |
 | Trip history | Yes — `Trips` queries |
 | Live GPS publishing during active trip | Yes — writes to `bus_location` |
+| Booking push notifications | Yes — FCM via Cloud Function on `Reservation` create; token synced on driver login |
+| Passenger list + pickup locations | Yes — driver dashboard streams `Reservation` by active `trip_id` |
 | QR scanner (student check-in) | No — scanned data kept in memory / local export only |
 
 ### Student
@@ -389,6 +397,11 @@ lib/
 │   └── firestore_collections.dart # Collection name constants
 ├── core/firestore/
 │   └── firestore_refresh_constants.dart  # Shared list refresh interval (5s)
+├── core/notifications/
+│   ├── notification_constants.dart       # FCM channel + payload keys
+│   ├── driver_notification_service.dart  # Permission, token sync, foreground display
+│   ├── driver_notification_providers.dart # Init controller on driver auth
+│   └── driver_notification_background.dart # Background message handler
 ├── features/bus_company/data/
 │   ├── bus_repository.dart
 │   ├── driver_repository.dart
@@ -430,6 +443,11 @@ lib/
 │   └── domain/
 │       ├── trip_profile.dart                # Firestore trip model; defaultTotalPassengers = 0
 │       └── trip_details.dart                # Trip + route + bus join; hasAvailableSeats
+├── features/driver/
+│   ├── data/
+│   │   └── driver_reservation_providers.dart  # driverTripReservationsProvider
+│   └── presentation/pages/
+│       └── dashboard_page.dart            # Passengers list + pickup + Open in Maps
 └── features/tracking/
     ├── data/
     │   ├── bus_location_repository.dart     # publish + fetch latest location per bus
@@ -457,6 +475,13 @@ State management uses **flutter_riverpod**. Repositories talk to Firestore/Auth;
 | `refreshActiveTickets()` | `Future<void>` | Invalidates active tickets provider (used on My Tickets open + pull-to-refresh) |
 | `studentTrackedBusesProvider` | `StreamProvider` | Polls active trips + latest `bus_location` per bus every 5s; excludes full buses and stale pings; UI sorts by user distance |
 | `refreshStudentLiveTracking()` | `Future<void>` | Invalidates live tracking provider (pull-to-refresh, header sync, error retry) |
+
+### Driver notification & bookings providers
+
+| Provider / helper | Type | Purpose |
+|----------|------|---------|
+| `driverNotificationControllerProvider` | `Provider` | Starts FCM token sync + foreground handlers when driver is authenticated |
+| `driverTripReservationsProvider` | `StreamProvider` | Real-time `Reservation` list for the driver’s active trip (`trip_id` query) |
 
 ### Student local storage (booking)
 
@@ -608,15 +633,77 @@ sequenceDiagram
   Page->>Provider: refreshStudentLiveTracking
 ```
 
+### Driver booking notification
+
+When a student completes booking, a Cloud Function sends FCM to the trip driver. The driver dashboard also streams reservations for the active trip.
+
+```mermaid
+sequenceDiagram
+  participant Student
+  participant App as FlutterApp
+  participant FS as Firestore
+  participant CF as CloudFunction
+  participant FCM as FirebaseMessaging
+  participant Driver
+
+  Student->>App: Complete payment / createBooking
+  App->>FS: Transaction: Reservation + Payment + total_passengers+1
+  FS->>CF: onCreate Reservation/{id}
+  CF->>FS: Read Trip, Route, drivers/{uid}.fcm_token
+  CF->>FCM: Send notification (count + pickup)
+  FCM->>Driver: Push alert
+  Note over Driver: Foreground: flutter_local_notifications
+  Driver->>App: Open dashboard
+  App->>FS: Stream Reservation where trip_id == activeTrip
+  App->>Driver: Passengers list + pickup locations
+```
+
+**Notification payload (`data` fields):**
+
+| Key | Value |
+|-----|-------|
+| `type` | `new_booking` |
+| `tripId` | Linked trip document id |
+| `reservationId` | New reservation id |
+| `totalPassengers` | Updated `Trips.total_passengers` (string) |
+| `pickupLocation` | Reservation `pickup_location` |
+| `pickupLat` / `pickupLng` | Present when `pickup_coordinates` exists |
+| `maskedPhone` | Last 4 digits masked (e.g. `***1234`) |
+
+**Cloud Function:** `functions/src/index.ts` → `notifyDriverOnBooking` (Firestore `onDocumentCreated` on `Reservation/{reservationId}`).
+
+**Client:** [`DriverNotificationService`](lib/core/notifications/driver_notification_service.dart) requests permission, calls `FirebaseMessaging.getToken()`, saves token via [`DriverRepository.saveFcmToken`](lib/features/bus_company/data/driver_repository.dart). Initialized from [`AuthGate`](lib/core/auth/auth_gate.dart) when role is driver.
+
+---
+
+## Cloud Messaging (FCM) — driver only
+
+| Component | Location | Role |
+|-----------|----------|------|
+| FCM token sync | `lib/core/notifications/driver_notification_service.dart` | Android driver login → `drivers/{uid}.fcm_token` |
+| Foreground display | `flutter_local_notifications` | Shows notification when app is open |
+| Background handler | `lib/core/notifications/driver_notification_background.dart` | Registered in `main.dart` |
+| Server send | `functions/src/index.ts` | `notifyDriverOnBooking` on reservation create |
+| Android permission | `android/app/src/main/AndroidManifest.xml` | `POST_NOTIFICATIONS` + default channel `driver_booking_channel` |
+
+**Deploy (requires Blaze plan for Cloud Functions):**
+
+```bash
+cd functions && npm install && npm run build
+firebase deploy --only functions,firestore:rules,firestore:indexes
+```
+
+If the driver has no `fcm_token`, the function logs and skips send; the dashboard passenger stream still updates.
+
 ---
 
 ## What is not connected yet (gaps)
 
 1. **Real payment gateway** — student checkout uses a fake/demo payment page; no PayPal/Apple Pay backend.
 2. **Driver scanner → Firestore** — driver QR scan does not yet update `Reservation.status` to `Boarded`.
-3. **Driver pickup visibility** — reservation `pickup_location` / `pickup_coordinates` are stored in Firestore but not yet shown on the driver dashboard or scanner.
-4. **Non-Android platforms** — Firebase not initialized on iOS/web/desktop in current code.
-5. **Firebase Storage, FCM, Analytics** — not used.
+3. **Non-Android platforms** — Firebase not initialized on iOS/web/desktop in current code; FCM is Android-only in this codebase.
+4. **Firebase Storage, Analytics** — not used.
+5. **Student/admin push notifications** — not implemented.
 
 ---
 
@@ -624,11 +711,13 @@ sequenceDiagram
 
 1. **Admin accounts** — create user in Firebase Auth, then add document `admins/{uid}` with `email` and optional `name`.
 2. **Driver accounts** — prefer creating via admin “Manage Drivers” UI (creates Auth + Firestore together).
-3. **Deploy rules/indexes** — required for student browse, booking, and live tracking (guest reads/writes). From project root:
+3. **Deploy rules/indexes/functions** — required for student browse, booking, live tracking, and driver notifications. From project root:
    ```bash
-   firebase deploy --only firestore:rules,firestore:indexes
+   cd functions && npm install && npm run build
+   firebase deploy --only firestore:rules,firestore:indexes,functions
    ```
-4. **Testing** — use an Android device or emulator; Firebase init is Android-only in this codebase. After changing providers or widget types (`StatefulWidget` → `ConsumerWidget`), use a **full restart** (`flutter run` or **R**), not hot reload alone.
+4. **Driver FCM testing** — log in as driver on Android; confirm `drivers/{uid}.fcm_token` in Firestore. Book a trip as student; driver should receive push + see passenger on dashboard.
+5. **Testing** — use an Android device or emulator; Firebase init is Android-only in this codebase. After changing providers or widget types (`StatefulWidget` → `ConsumerWidget`), use a **full restart** (`flutter run` or **R**), not hot reload alone.
 
 ---
 
@@ -636,8 +725,9 @@ sequenceDiagram
 
 | File | Role |
 |------|------|
-| `firebase.json` | Firestore rules & indexes config |
-| `firestore.rules` | Security rules including guest booking (`isGuestBookingUpdate`, `isValidReservationCreate`, `isValidReservationPickup`) |
+| `firebase.json` | Firestore rules, indexes, and Cloud Functions config |
+| `functions/src/index.ts` | `notifyDriverOnBooking` — FCM on reservation create |
+| `firestore.rules` | Security rules including guest booking and driver FCM token update (`isDriverFcmTokenUpdate`) |
 | `firestore.indexes.json` | Composite indexes |
 | `.firebaserc` | Project alias |
 | `android/app/google-services.json` | Android Firebase app config |
@@ -660,3 +750,8 @@ sequenceDiagram
 | `lib/features/student/presentation/pages/my_tickets_page.dart` | Active tickets list (active trips only) |
 | `lib/features/student/presentation/pages/payment_gateway_page.dart` | Demo checkout; triggers Firestore booking |
 | `lib/core/validation/phone_number_validator.dart` | Palestinian phone validation |
+| `lib/core/notifications/driver_notification_service.dart` | Driver FCM permission, token sync, foreground notifications |
+| `lib/core/notifications/driver_notification_providers.dart` | `driverNotificationControllerProvider` |
+| `lib/features/driver/data/driver_reservation_providers.dart` | `driverTripReservationsProvider` |
+| `lib/features/driver/presentation/pages/dashboard_page.dart` | Driver dashboard with Passengers section |
+| `lib/features/bus_company/data/driver_repository.dart` | `saveFcmToken()` for driver push |

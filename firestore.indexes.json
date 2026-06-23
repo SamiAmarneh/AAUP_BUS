@@ -99,6 +99,20 @@
       ]
     },
     {
+      "collectionGroup": "Reservation",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "trip_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "reservation_time",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "bus_location",
       "queryScope": "COLLECTION",
       "fields": [

@@ -197,6 +197,29 @@ class ReservationRepository {
         .toList();
   }
 
+  Stream<List<ReservationProfile>> watchReservationsForTrip(String tripId) {
+    final trimmedTripId = tripId.trim();
+    if (trimmedTripId.isEmpty) {
+      return Stream.value(const <ReservationProfile>[]);
+    }
+
+    return _firestore
+        .collection(FirestoreCollections.reservation)
+        .where('trip_id', isEqualTo: _tripReference(trimmedTripId))
+        .orderBy('reservation_time', descending: true)
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map(
+                (doc) => ReservationProfile.fromFirestore(
+                  id: doc.id,
+                  data: doc.data(),
+                ),
+              )
+              .toList(),
+        );
+  }
+
   Future<int> countBookingsToday() async {
     final now = DateTime.now();
     final startOfDay = DateTime(now.year, now.month, now.day);

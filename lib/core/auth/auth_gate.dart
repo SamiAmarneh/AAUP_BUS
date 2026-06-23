@@ -6,6 +6,7 @@ import '../../features/driver/presentation/pages/dashboard_page.dart';
 import '../../features/home/presentation/pages/home_page.dart';
 import '../../features/student/presentation/pages/login_page.dart';
 import '../../features/tracking/data/bus_location_providers.dart';
+import '../notifications/driver_notification_providers.dart';
 import '../session/session_providers.dart';
 import 'auth_providers.dart';
 import 'user_role.dart';
@@ -73,6 +74,7 @@ class _AuthenticatedHome extends ConsumerWidget {
           UserRole.admin => const AdminDashboardPage(),
           UserRole.driver => () {
             ref.watch(busLocationTrackingProvider);
+            ref.watch(driverNotificationControllerProvider);
             return const DriverDashboardPage();
           }(),
         };
