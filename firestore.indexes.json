@@ -109,6 +109,10 @@
         {
           "fieldPath": "reservation_time",
           "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "DESCENDING"
         }
       ]
     },

@@ -552,7 +552,8 @@ class _DriverDashboardBodyState extends ConsumerState<_DriverDashboardBody> {
   }
 
   Widget _buildPassengersSection(TripDetails tripDetails) {
-    final reservationsAsync = ref.watch(driverTripReservationsProvider);
+    final tripId = tripDetails.trip.id;
+    final reservationsAsync = ref.watch(driverTripPassengersProvider(tripId));
     final bookedCount = tripDetails.trip.totalPassengers;
     final seatCapacity = tripDetails.bus.capacity;
 

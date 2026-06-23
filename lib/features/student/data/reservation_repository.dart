@@ -206,17 +206,21 @@ class ReservationRepository {
     return _firestore
         .collection(FirestoreCollections.reservation)
         .where('trip_id', isEqualTo: _tripReference(trimmedTripId))
-        .orderBy('reservation_time', descending: true)
         .snapshots()
         .map(
-          (snapshot) => snapshot.docs
-              .map(
-                (doc) => ReservationProfile.fromFirestore(
-                  id: doc.id,
-                  data: doc.data(),
-                ),
-              )
-              .toList(),
+          (snapshot) {
+            final reservations = snapshot.docs
+                .map(
+                  (doc) => ReservationProfile.fromFirestore(
+                    id: doc.id,
+                    data: doc.data(),
+                  ),
+                )
+                .toList();
+
+            reservations.sort(_compareReservationsByTimeDesc);
+            return reservations;
+          },
         );
   }
 
@@ -382,6 +386,24 @@ class ReservationRepository {
     return _firestore
         .collection(FirestoreCollections.reservation)
         .doc(reservationId);
+  }
+
+  static int _compareReservationsByTimeDesc(
+    ReservationProfile left,
+    ReservationProfile right,
+  ) {
+    final leftTime = left.reservationTime;
+    final rightTime = right.reservationTime;
+    if (leftTime == null && rightTime == null) {
+      return 0;
+    }
+    if (leftTime == null) {
+      return 1;
+    }
+    if (rightTime == null) {
+      return -1;
+    }
+    return rightTime.compareTo(leftTime);
   }
 
   _ResolvedPickup _resolvePickupForBooking({
