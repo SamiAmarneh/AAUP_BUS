@@ -6,10 +6,7 @@ import '../../../../core/auth/auth_providers.dart';
 import '../../data/admin_dashboard_providers.dart';
 import '../../data/bus_providers.dart';
 import 'route_management_page.dart';
-import 'trips_management_page.dart';
 import 'bus_management_page.dart';
-import 'trip_tracking_page.dart';
-import 'qr_code_generation_page.dart';
 import 'manage_drivers_page.dart';
 
 class AdminDashboardPage extends ConsumerWidget {
@@ -137,12 +134,9 @@ class AdminDashboardPage extends ConsumerWidget {
                 child: ListView(
                   padding: const EdgeInsets.symmetric(horizontal: 25),
                   children: [
-                    _buildActionItem(context, 'Manage Trips', 'View and edit trip schedules', Icons.assignment_outlined, const Color(0xFFE8F0FF), const Color(0xFF247BFF), const TripsManagementPage()),
                     _buildActionItem(context, 'Manage Routes', 'View and edit bus routes', Icons.route_outlined, const Color(0xFFFFF3E0), const Color(0xFFFF9800), const RouteManagementPage()),
                     _buildActionItem(context, 'Manage Buses', 'View and edit bus fleet', Icons.sync_alt, const Color(0xFFE8F5E9), const Color(0xFF4CAF50), const BusManagementPage()),
                     _buildActionItem(context, 'Manage Drivers', 'Create and manage driver accounts', Icons.person_add_outlined, const Color(0xFFE3F2FD), const Color(0xFF2196F3), const ManageDriversPage()),
-                    _buildActionItem(context, 'Track Trips', 'Live location tracking', Icons.map_outlined, const Color(0xFFF3E5F5), const Color(0xFF9C27B0), const TripTrackingPage()),
-                    _buildActionItem(context, 'Generate QR Code', 'Student check-in codes', Icons.qr_code_scanner, const Color(0xFFFFF3E0), const Color(0xFFFF9800), const QRCodeGenerationPage()),
                   ],
                 ),
               ),
