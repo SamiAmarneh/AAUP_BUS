@@ -10,6 +10,8 @@ class ReservationProfile {
     required this.qrData,
     required this.status,
     this.reservationTime,
+    this.pickupLocation = '',
+    this.pickupCoordinates,
   });
 
   final String id;
@@ -18,6 +20,8 @@ class ReservationProfile {
   final String qrData;
   final String status;
   final DateTime? reservationTime;
+  final String pickupLocation;
+  final GeoPoint? pickupCoordinates;
 
   bool get isWaitingBoarding => status == ReservationStatus.waitingBoarding;
 
@@ -36,6 +40,8 @@ class ReservationProfile {
         fallback: ReservationStatus.waitingBoarding,
       ),
       reservationTime: _readTimestamp(data, 'reservation_time'),
+      pickupLocation: _readString(data, 'pickup_location'),
+      pickupCoordinates: _readGeoPoint(data, 'pickup_coordinates'),
     );
   }
 
@@ -63,5 +69,10 @@ class ReservationProfile {
   static DateTime? _readTimestamp(Map<String, dynamic> data, String key) {
     final value = data[key];
     return value is Timestamp ? value.toDate() : null;
+  }
+
+  static GeoPoint? _readGeoPoint(Map<String, dynamic> data, String key) {
+    final value = data[key];
+    return value is GeoPoint ? value : null;
   }
 }

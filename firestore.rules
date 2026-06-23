@@ -78,6 +78,7 @@ service cloud.firestore {
     }
 
     function isValidReservationCreate() {
+      let trip = get(request.resource.data.trip_id);
       return request.auth == null
         && request.resource.data.trip_id is path
         && request.resource.data.reservation_time == request.time
@@ -86,9 +87,23 @@ service cloud.firestore {
         && request.resource.data.qr_data is string
         && request.resource.data.qr_data.size() > 0
         && request.resource.data.status == 'waiting-boarding'
+        && request.resource.data.pickup_location is string
+        && request.resource.data.pickup_location.size() > 0
         && exists(request.resource.data.trip_id)
-        && (get(request.resource.data.trip_id).data.status == 'Waiting-Passengers'
-          || get(request.resource.data.trip_id).data.status == 'On-the-way');
+        && (trip.data.status == 'Waiting-Passengers'
+          || trip.data.status == 'On-the-way')
+        && isValidReservationPickup(trip);
+    }
+
+    function isValidReservationPickup(trip) {
+      let tripStatus = trip.data.status;
+      let hasCoordinates = 'pickup_coordinates' in request.resource.data
+        && request.resource.data.pickup_coordinates is latlng;
+
+      return tripStatus == 'Waiting-Passengers'
+        && !hasCoordinates
+        || tripStatus == 'On-the-way'
+        && (!('pickup_coordinates' in request.resource.data) || hasCoordinates);
     }
 
     function isValidPaymentCreate() {

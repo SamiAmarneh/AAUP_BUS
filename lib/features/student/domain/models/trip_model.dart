@@ -1,4 +1,5 @@
 import '../../../trips/domain/trip_details.dart';
+import '../../../trips/domain/trip_status.dart';
 
 class Trip {
   const Trip({
@@ -24,6 +25,8 @@ class Trip {
   final String to;
   final int availableSeats;
   final int totalSeats;
+
+  bool get requiresPickupInput => status == TripStatus.onTheWay;
 
   factory Trip.fromTripDetails(TripDetails details) {
     final routeGroupLabel = details.route.routeName.isNotEmpty

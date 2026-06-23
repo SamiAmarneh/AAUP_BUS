@@ -160,6 +160,10 @@ class BookingConfirmationPage extends StatelessWidget {
           const SizedBox(height: 16),
           _buildDetailRow('Bus', reservationDetails.busName),
           _buildDetailRow('Phone', reservationDetails.phoneNumber),
+          if (reservationDetails.pickupLocation.isNotEmpty)
+            _buildDetailRow('Pickup', reservationDetails.pickupLocation),
+          if (reservationDetails.hasPickupCoordinates)
+            _buildDetailRow('GPS', 'Location attached'),
           _buildDetailRow(
             'Reserved at',
             _formatDateTime(reservationDetails.reservationTime),

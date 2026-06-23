@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/validation/phone_number_validator.dart';
+import '../../../trips/domain/trip_status.dart';
 import '../../data/reservation_providers.dart';
 import '../../domain/models/trip_model.dart';
 import 'payment_gateway_page.dart';
+import 'pickup_location_page.dart';
 
 class PhoneEntryPage extends ConsumerStatefulWidget {
   final Trip trip;
@@ -58,13 +60,20 @@ class _PhoneEntryPageState extends ConsumerState<PhoneEntryPage> {
     }
 
     final normalizedPhone = PhoneNumberValidator.normalizePhoneNumber(phone);
+    final requiresPickup = widget.trip.status == TripStatus.onTheWay;
+
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => PaymentGatewayPage(
-          trip: widget.trip,
-          phoneNumber: normalizedPhone,
-        ),
+        builder: (context) => requiresPickup
+            ? PickupLocationPage(
+                trip: widget.trip,
+                phoneNumber: normalizedPhone,
+              )
+            : PaymentGatewayPage(
+                trip: widget.trip,
+                phoneNumber: normalizedPhone,
+              ),
       ),
     );
   }

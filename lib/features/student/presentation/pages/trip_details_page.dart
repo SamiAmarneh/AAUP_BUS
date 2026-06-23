@@ -244,6 +244,36 @@ class TripDetailsPage extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 24),
+                  if (trip.requiresPickupInput) ...[
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF8E6),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFFFE08A)),
+                      ),
+                      child: Row(
+                        children: const [
+                          Icon(
+                            Icons.info_outline,
+                            color: Color(0xFFF59E0B),
+                            size: 20,
+                          ),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'This bus is on the way. You will need to specify your pickup point next.',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF1F3A57),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
 
                   // Features Section
                   const Text(

@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 import 'payment_profile.dart';
 import 'reservation_profile.dart';
 
@@ -29,4 +31,7 @@ class ReservationDetails {
   String get reservationStatus => reservation.status;
   double get paymentAmount => payment.amount;
   String get paymentStatus => payment.paymentStatus;
+  String get pickupLocation => reservation.pickupLocation;
+  GeoPoint? get pickupCoordinates => reservation.pickupCoordinates;
+  bool get hasPickupCoordinates => pickupCoordinates != null;
 }

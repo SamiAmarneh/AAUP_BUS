@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -11,11 +12,15 @@ import 'booking_confirmation_page.dart';
 class PaymentGatewayPage extends ConsumerStatefulWidget {
   final Trip trip;
   final String phoneNumber;
+  final String? pickupLocation;
+  final GeoPoint? pickupCoordinates;
 
   const PaymentGatewayPage({
     super.key,
     required this.trip,
     required this.phoneNumber,
+    this.pickupLocation,
+    this.pickupCoordinates,
   });
 
   @override
@@ -40,6 +45,8 @@ class _PaymentGatewayPageState extends ConsumerState<PaymentGatewayPage> {
       final details = await repository.createBooking(
         trip: widget.trip,
         phoneNumber: widget.phoneNumber,
+        pickupLocation: widget.pickupLocation,
+        pickupCoordinates: widget.pickupCoordinates,
       );
 
       await localStorage.savePhoneNumber(widget.phoneNumber);
@@ -283,6 +290,12 @@ class _PaymentGatewayPageState extends ConsumerState<PaymentGatewayPage> {
           const SizedBox(height: 12),
           _buildSummaryRow('Bus', widget.trip.company),
           _buildSummaryRow('Phone', widget.phoneNumber),
+          if (widget.trip.requiresPickupInput &&
+              widget.pickupLocation != null) ...[
+            _buildSummaryRow('Pickup', widget.pickupLocation!),
+            if (widget.pickupCoordinates != null)
+              _buildSummaryRow('GPS', 'Location attached'),
+          ],
           const SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,

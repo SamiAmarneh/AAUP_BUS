@@ -236,13 +236,19 @@ Student booking records. Document ID is used in `qr_data` for driver scanner che
 | `phone_number` | string | Normalized Palestinian mobile number |
 | `qr_data` | string | JSON string: `{"id":"{reservationId}","trip":"{route}","bus":"{busName}"}` |
 | `status` | string | `waiting-boarding` (default) or `Boarded` |
+| `pickup_location` | string | Required on create. Auto-set to route `start_location` when trip is `Waiting-Passengers`; student-provided text when `On-the-way` |
+| `pickup_coordinates` | GeoPoint | Optional. Only written when trip is `On-the-way` and student captures GPS |
 
 **App usage (`ReservationRepository.createBooking`):**
 
 - Runs in a Firestore **transaction** that:
   1. Re-reads the trip and rejects if status is not active or `total_passengers >= bus capacity`
-  2. Creates `Reservation` + `Payment`
-  3. Increments `Trips.total_passengers` by 1
+  2. Resolves pickup based on trip status:
+     - **`Waiting-Passengers`**: sets `pickup_location` to route start (no coordinates)
+     - **`On-the-way`**: requires non-empty `pickup_location`; optional `pickup_coordinates`
+  3. Creates `Reservation` + `Payment`
+  4. Increments `Trips.total_passengers` by 1
+- Booking flow: `TripDetailsPage` → `PhoneEntryPage` → (`PickupLocationPage` when trip is `On-the-way`) → `PaymentGatewayPage`
 - Normalizes and validates Palestinian phone via [`PhoneNumberValidator`](lib/core/validation/phone_number_validator.dart)
 - Builds `qr_data` as a JSON string via `jsonEncode` with `{ id, trip, bus }` (see [`ReservationQrDataCodec`](lib/core/reservation/reservation_qr_data_codec.dart))
 - After success, [`PaymentGatewayPage`](lib/features/student/presentation/pages/payment_gateway_page.dart) saves phone + reservation ID locally, calls `refreshStudentBrowseData()`, and invalidates `activeTicketsProvider`
@@ -288,7 +294,7 @@ Students have **no Firebase Auth** session. Public read is enabled via **separat
 | `Payment/{id}` | All documents (for ticket payment details) |
 | `bus_location/{id}` | All documents (latest ping per bus for student live map) |
 
-**Guest writes (booking):** unauthenticated users can create `Reservation` and `Payment` documents and increment `Trips.total_passengers` by exactly 1 on active trips (`Waiting-Passengers` or `On-the-way`), validated by `isGuestBookingUpdate()` in security rules. The app also re-validates trip status and capacity inside the booking transaction before writing.
+**Guest writes (booking):** unauthenticated users can create `Reservation` and `Payment` documents and increment `Trips.total_passengers` by exactly 1 on active trips (`Waiting-Passengers` or `On-the-way`), validated by `isGuestBookingUpdate()` in security rules. Reservation creates require non-empty `pickup_location`; `pickup_coordinates` is forbidden for `Waiting-Passengers` trips and optional for `On-the-way` trips (`isValidReservationPickup`). The app also re-validates trip status, pickup rules, and capacity inside the booking transaction before writing.
 
 Admin and driver retain broader authenticated read rules on the same collections.
 

@@ -34,6 +34,8 @@ class ReservationRepository {
   Future<ReservationDetails> createBooking({
     required Trip trip,
     required String phoneNumber,
+    String? pickupLocation,
+    GeoPoint? pickupCoordinates,
   }) async {
     final tripId = trip.id;
     if (tripId == null || tripId.isEmpty) {
@@ -89,13 +91,27 @@ class ReservationRepository {
           );
         }
 
-        transaction.set(reservationRef, {
+        final resolvedPickup = _resolvePickupForBooking(
+          tripStatus: tripProfile.status,
+          routeStartLocation: trip.from,
+          pickupLocation: pickupLocation,
+          pickupCoordinates: pickupCoordinates,
+        );
+
+        final reservationData = <String, dynamic>{
           'trip_id': tripRef,
           'reservation_time': FieldValue.serverTimestamp(),
           'phone_number': normalizedPhone,
           'qr_data': qrData,
           'status': ReservationStatus.waitingBoarding,
-        });
+          'pickup_location': resolvedPickup.location,
+        };
+
+        if (resolvedPickup.coordinates != null) {
+          reservationData['pickup_coordinates'] = resolvedPickup.coordinates;
+        }
+
+        transaction.set(reservationRef, reservationData);
 
         transaction.set(paymentRef, {
           'reservation_id': reservationRef,
@@ -326,4 +342,51 @@ class ReservationRepository {
         .collection(FirestoreCollections.reservation)
         .doc(reservationId);
   }
+
+  _ResolvedPickup _resolvePickupForBooking({
+    required String tripStatus,
+    required String routeStartLocation,
+    String? pickupLocation,
+    GeoPoint? pickupCoordinates,
+  }) {
+    if (tripStatus == TripStatus.waitingPassengers) {
+      final startLocation = routeStartLocation.trim();
+      if (startLocation.isEmpty) {
+        throw const AuthFailure(
+          AuthFailureType.unknown,
+          'Route start location is missing for this trip.',
+        );
+      }
+      return _ResolvedPickup(location: startLocation);
+    }
+
+    if (tripStatus == TripStatus.onTheWay) {
+      final trimmedLocation = pickupLocation?.trim() ?? '';
+      if (trimmedLocation.isEmpty) {
+        throw const AuthFailure(
+          AuthFailureType.unknown,
+          'Please specify your pickup location.',
+        );
+      }
+      return _ResolvedPickup(
+        location: trimmedLocation,
+        coordinates: pickupCoordinates,
+      );
+    }
+
+    throw const AuthFailure(
+      AuthFailureType.unknown,
+      'This trip is no longer available for booking.',
+    );
+  }
+}
+
+class _ResolvedPickup {
+  const _ResolvedPickup({
+    required this.location,
+    this.coordinates,
+  });
+
+  final String location;
+  final GeoPoint? coordinates;
 }
