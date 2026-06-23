@@ -6,7 +6,7 @@ This document describes what is **actually implemented and connected to Firebase
 
 ## Overview
 
-The app uses **Firebase Authentication** and **Cloud Firestore** for admin (bus company) and driver workflows. Students use a **guest session** stored in `SharedPreferences` — they do **not** sign in with Firebase Auth, but can **read active trips, routes, and buses** from Firestore, **book trips** (phone + fake payment → `Reservation` + `Payment`), and view **My Tickets** from locally stored reservation IDs.
+The app uses **Firebase Authentication** and **Cloud Firestore** for admin (bus company) and driver workflows. Students use a **guest session** stored in `SharedPreferences` — they do **not** sign in with Firebase Auth, but can **read active trips, routes, and buses** from Firestore, **book trips** (phone + conditional pickup + fake payment → `Reservation` + `Payment`), and view **My Tickets** from locally stored reservation IDs.
 
 | Firebase service | Used? | Purpose |
 |------------------|-------|---------|
@@ -182,6 +182,15 @@ New trips are created with `total_passengers: 0`. Driver trip creation also requ
 
 Active statuses (used for queries): `Waiting-Passengers`, `On-the-way`.
 
+**Student booking vs trip status:** pickup handling depends on status at booking time (re-checked inside the booking transaction):
+
+| Trip status at booking | Student pickup UI | `pickup_location` on `Reservation` | `pickup_coordinates` |
+|------------------------|-------------------|------------------------------------|------------------------|
+| `Waiting-Passengers` | None (skip pickup step) | Route `start_location` (auto) | Not written |
+| `On-the-way` | Required text + optional GPS | Student-provided description | Optional GeoPoint if GPS captured |
+
+Constants: [`TripStatus`](lib/features/trips/domain/trip_status.dart) (`waitingPassengers`, `onTheWay`). UI helper: `Trip.requiresPickupInput` in [`trip_model.dart`](lib/features/student/domain/models/trip_model.dart).
+
 **App usage (`TripRepository`):**
 
 - Driver creates trip (requires assigned active bus + route with price)
@@ -253,9 +262,9 @@ Student booking records. Document ID is used in `qr_data` for driver scanner che
 - Builds `qr_data` as a JSON string via `jsonEncode` with `{ id, trip, bus }` (see [`ReservationQrDataCodec`](lib/core/reservation/reservation_qr_data_codec.dart))
 - After success, [`PaymentGatewayPage`](lib/features/student/presentation/pages/payment_gateway_page.dart) saves phone + reservation ID locally, calls `refreshStudentBrowseData()`, and invalidates `activeTicketsProvider`
 
-**Fetching reservations:** My Tickets loads docs by **stored reservation IDs** (individual `get` per ID, batched in groups of 10 for loop organization). Each reservation is joined with its trip, bus, route, and payment. `fetchActiveReservationsByIds` keeps only tickets whose linked trip is still `Waiting-Passengers` or `On-the-way`.
+**Fetching reservations:** My Tickets loads docs by **stored reservation IDs** (individual `get` per ID, batched in groups of 10 for loop organization). Each reservation is joined with its trip, bus, route, and payment. `fetchActiveReservationsByIds` keeps only tickets whose linked trip is still `Waiting-Passengers` or `On-the-way`. Pickup fields are surfaced on confirmation and ticket detail screens.
 
-**Rules:** guest (unauthenticated) create with field validation; guest read; admin update/delete.
+**Rules:** guest (unauthenticated) create with field validation via `isValidReservationCreate()` + `isValidReservationPickup()`; guest read; admin update/delete.
 
 ---
 
@@ -295,6 +304,15 @@ Students have **no Firebase Auth** session. Public read is enabled via **separat
 | `bus_location/{id}` | All documents (latest ping per bus for student live map) |
 
 **Guest writes (booking):** unauthenticated users can create `Reservation` and `Payment` documents and increment `Trips.total_passengers` by exactly 1 on active trips (`Waiting-Passengers` or `On-the-way`), validated by `isGuestBookingUpdate()` in security rules. Reservation creates require non-empty `pickup_location`; `pickup_coordinates` is forbidden for `Waiting-Passengers` trips and optional for `On-the-way` trips (`isValidReservationPickup`). The app also re-validates trip status, pickup rules, and capacity inside the booking transaction before writing.
+
+**Reservation create validation (`isValidReservationCreate` + `isValidReservationPickup`):**
+
+| Linked trip status | `pickup_location` | `pickup_coordinates` |
+|--------------------|-------------------|----------------------|
+| `Waiting-Passengers` | Required non-empty string | Must not be present |
+| `On-the-way` | Required non-empty string | Optional `latlng` |
+
+Other required reservation fields on create: `trip_id` (path to active trip), `phone_number`, `qr_data`, `status == waiting-boarding`, `reservation_time == request.time`.
 
 Admin and driver retain broader authenticated read rules on the same collections.
 
@@ -351,11 +369,11 @@ Trip history falls back to client-side sorting if the composite index is missing
 | Guest “login” | No — `SharedPreferences` only |
 | Browse trips | Yes — [`BrowseTripsPage`](lib/features/student/presentation/pages/browse_trips_page.dart) reads active `Trips`, `routes`, and `buses`; **excludes `Arrived` and full buses**; route filter chips; **5s poll**; **pull-to-refresh**, header refresh button, and error retry via `refreshStudentBrowseData()` |
 | Live bus tracking map | Yes — [`LiveTrackingPage`](lib/features/student/presentation/pages/live_tracking_page.dart) reads active bookable `Trips` + latest `bus_location` per bus; **sorted nearest-first** using user GPS; distance shown from user; tap bus → [`TripDetailsPage`](lib/features/student/presentation/pages/trip_details_page.dart); map marker tap focuses bus; **full buses hidden**; **5s poll**; pull-to-refresh + header sync |
-| Trip details → booking | Yes — [`TripDetailsPage`](lib/features/student/presentation/pages/trip_details_page.dart) → [`PhoneEntryPage`](lib/features/student/presentation/pages/phone_entry_page.dart) → [`PaymentGatewayPage`](lib/features/student/presentation/pages/payment_gateway_page.dart) |
-| Reservations / payments | Yes — phone entry → fake payment → Firestore transaction (`Reservation`, `Payment`, `Trips.total_passengers`); refreshes browse list + tickets after booking |
+| Trip details → booking | Yes — [`TripDetailsPage`](lib/features/student/presentation/pages/trip_details_page.dart) → [`PhoneEntryPage`](lib/features/student/presentation/pages/phone_entry_page.dart) → ([`PickupLocationPage`](lib/features/student/presentation/pages/pickup_location_page.dart) when trip is `On-the-way`) → [`PaymentGatewayPage`](lib/features/student/presentation/pages/payment_gateway_page.dart) |
+| Reservations / payments | Yes — phone entry → conditional pickup (on-the-way only) → fake payment → Firestore transaction (`Reservation` with `pickup_location` / optional `pickup_coordinates`, `Payment`, `Trips.total_passengers`); refreshes browse list + tickets after booking |
+| Booking confirmation | Yes — [`BookingConfirmationPage`](lib/features/student/presentation/pages/booking_confirmation_page.dart) shows QR from `qr_data`, pickup location, and GPS indicator; links to browse / My Tickets |
+| Ticket details | Yes — [`TicketDetailsPage`](lib/features/student/presentation/pages/ticket_details_page.dart) reads joined `ReservationDetails` including pickup fields |
 | My Tickets | Yes — [`MyTicketsPage`](lib/features/student/presentation/pages/my_tickets_page.dart); loads local reservation IDs; shows only tickets for **active** trips; 5s poll; pull-to-refresh + refresh on page open |
-| Booking confirmation | Yes — [`BookingConfirmationPage`](lib/features/student/presentation/pages/booking_confirmation_page.dart) shows QR from `qr_data`; links to browse / My Tickets |
-| Ticket details | Yes — [`TicketDetailsPage`](lib/features/student/presentation/pages/ticket_details_page.dart) reads joined `ReservationDetails` |
 
 ---
 
@@ -385,8 +403,8 @@ lib/
 │   │   ├── student_live_tracking_providers.dart  # studentTrackedBusesProvider, refreshStudentLiveTracking()
 │   │   └── student_booking_local_storage.dart  # StudentBookingStorageKeys
 │   ├── domain/
-│   │   ├── models/trip_model.dart           # Trip UI adapter (Trip.fromTripDetails)
-│   │   ├── models/reservation_profile.dart
+│   │   ├── models/trip_model.dart           # Trip UI adapter; requiresPickupInput for on-the-way
+│   │   ├── models/reservation_profile.dart  # pickup_location, pickup_coordinates
 │   │   ├── models/payment_profile.dart
 │   │   ├── models/reservation_details.dart
 │   │   ├── reservation_status.dart          # waiting-boarding, Boarded
@@ -395,11 +413,14 @@ lib/
 │       ├── browse_trips_page.dart
 │       ├── trip_details_page.dart
 │       ├── phone_entry_page.dart
+│       ├── pickup_location_page.dart        # On-the-way pickup text + optional GPS
 │       ├── payment_gateway_page.dart        # Fake/demo checkout
 │       ├── booking_confirmation_page.dart
 │       ├── my_tickets_page.dart
 │       ├── live_tracking_page.dart
 │       └── ticket_details_page.dart
+├── core/permissions/
+│   └── location_permission_service.dart     # GPS permission for pickup + live tracking
 ├── core/validation/
 │   └── phone_number_validator.dart          # Palestinian phone validation
 ├── features/trips/
@@ -526,26 +547,40 @@ sequenceDiagram
 
 ### Student booking flow
 
+Pickup is **conditional on trip status** at booking time. Status is re-read inside the Firestore transaction so a trip that becomes unavailable while the student is on the phone or pickup screen is rejected.
+
 ```mermaid
 sequenceDiagram
   participant Student
   participant PhonePage as PhoneEntryPage
+  participant PickupPage as PickupLocationPage
   participant PayPage as PaymentGatewayPage
   participant Repo as ReservationRepository
   participant Local as SharedPreferences
   participant FS as Firestore
 
   Student->>PhonePage: Enter Palestinian phone
-  PhonePage->>PayPage: trip + phone
+  alt Trip status is On-the-way
+    PhonePage->>PickupPage: trip + phone
+    Student->>PickupPage: Enter pickup text (+ optional GPS)
+    PickupPage->>PayPage: trip + phone + pickup
+  else Trip status is Waiting-Passengers
+    PhonePage->>PayPage: trip + phone
+  end
   Student->>PayPage: Complete Payment
   PayPage->>Repo: createBooking
   Repo->>FS: Transaction
   Note over FS: Re-read trip; reject if inactive or full
+  alt Waiting-Passengers
+    Note over FS: pickup_location = route start; no coordinates
+  else On-the-way
+    Note over FS: pickup_location required; optional pickup_coordinates
+  end
   Note over FS: Reservation + Payment + total_passengers+1
   Repo-->>PayPage: ReservationDetails
   PayPage->>Local: Save phone + reservation ID
   PayPage->>Providers: refreshStudentBrowseData + invalidate activeTickets
-  PayPage->>Student: BookingConfirmationPage with QR
+  PayPage->>Student: BookingConfirmationPage with QR + pickup
 ```
 
 ### Student live tracking
@@ -579,8 +614,9 @@ sequenceDiagram
 
 1. **Real payment gateway** — student checkout uses a fake/demo payment page; no PayPal/Apple Pay backend.
 2. **Driver scanner → Firestore** — driver QR scan does not yet update `Reservation.status` to `Boarded`.
-3. **Non-Android platforms** — Firebase not initialized on iOS/web/desktop in current code.
-4. **Firebase Storage, FCM, Analytics** — not used.
+3. **Driver pickup visibility** — reservation `pickup_location` / `pickup_coordinates` are stored in Firestore but not yet shown on the driver dashboard or scanner.
+4. **Non-Android platforms** — Firebase not initialized on iOS/web/desktop in current code.
+5. **Firebase Storage, FCM, Analytics** — not used.
 
 ---
 
@@ -601,7 +637,7 @@ sequenceDiagram
 | File | Role |
 |------|------|
 | `firebase.json` | Firestore rules & indexes config |
-| `firestore.rules` | Security rules including guest booking (`isGuestBookingUpdate`, `isValidReservationCreate`) |
+| `firestore.rules` | Security rules including guest booking (`isGuestBookingUpdate`, `isValidReservationCreate`, `isValidReservationPickup`) |
 | `firestore.indexes.json` | Composite indexes |
 | `.firebaserc` | Project alias |
 | `android/app/google-services.json` | Android Firebase app config |
@@ -614,7 +650,9 @@ sequenceDiagram
 | `lib/features/trips/domain/trip_details.dart` | Joined trip + route + bus model; `hasAvailableSeats` |
 | `lib/features/trips/data/trip_repository.dart` | Trip queries; browse list sorted by `created_at` desc; full-bus filter |
 | `lib/features/student/domain/models/trip_model.dart` | UI `Trip` adapter from `TripDetails` (seat counts for cards) |
-| `lib/features/student/data/reservation_repository.dart` | Booking transaction + reservation/payment joins |
+| `lib/features/student/data/reservation_repository.dart` | Booking transaction; conditional pickup resolution + reservation/payment joins |
+| `lib/features/student/presentation/pages/pickup_location_page.dart` | On-the-way pickup text + optional GPS before payment |
+| `lib/features/student/presentation/pages/phone_entry_page.dart` | Phone entry; branches to pickup or payment by trip status |
 | `lib/features/student/data/student_reservation_providers.dart` | `activeTicketsProvider`, `refreshActiveTickets()` |
 | `lib/features/student/data/student_live_tracking_providers.dart` | `studentTrackedBusesProvider`, `refreshStudentLiveTracking()` |
 | `lib/features/student/presentation/pages/live_tracking_page.dart` | Student live map + bus list from `bus_location` |
