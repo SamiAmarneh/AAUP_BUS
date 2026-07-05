@@ -224,6 +224,66 @@ class ReservationRepository {
         );
   }
 
+  Future<ReservationCheckInResult> checkInReservation({
+    required String reservationId,
+    required String activeTripId,
+  }) async {
+    final trimmedReservationId = reservationId.trim();
+    final trimmedActiveTripId = activeTripId.trim();
+
+    if (trimmedReservationId.isEmpty || trimmedActiveTripId.isEmpty) {
+      return const ReservationCheckInNotFound();
+    }
+
+    final reservationRef = _reservationReference(trimmedReservationId);
+
+    try {
+      final outcome = await _firestore.runTransaction(
+        (transaction) async {
+          final snapshot = await transaction.get(reservationRef);
+          if (!snapshot.exists) {
+            return _CheckInTransactionOutcome.notFound;
+          }
+
+          final reservation = ReservationProfile.fromFirestore(
+            id: snapshot.id,
+            data: snapshot.data() ?? {},
+          );
+
+          if (reservation.tripId != trimmedActiveTripId) {
+            return _CheckInTransactionOutcome.wrongTrip;
+          }
+
+          if (reservation.isBoarded) {
+            return _CheckInTransactionOutcome.alreadyBoarded;
+          }
+
+          if (!reservation.isWaitingBoarding) {
+            return _CheckInTransactionOutcome.notFound;
+          }
+
+          transaction.update(reservationRef, {
+            'status': ReservationStatus.boarded,
+          });
+
+          return _CheckInTransactionOutcome.boarded;
+        },
+      );
+
+      return switch (outcome) {
+        _CheckInTransactionOutcome.boarded => ReservationCheckInBoarded(
+          await _fetchReservationProfile(trimmedReservationId),
+        ),
+        _CheckInTransactionOutcome.alreadyBoarded =>
+          const ReservationCheckInAlreadyBoarded(),
+        _CheckInTransactionOutcome.wrongTrip => const ReservationCheckInWrongTrip(),
+        _CheckInTransactionOutcome.notFound => const ReservationCheckInNotFound(),
+      };
+    } on FirebaseException catch (exception) {
+      throw mapFirestoreException(exception);
+    }
+  }
+
   Future<int> countBookingsToday() async {
     final now = DateTime.now();
     final startOfDay = DateTime(now.year, now.month, now.day);
@@ -452,4 +512,33 @@ class _ResolvedPickup {
 
   final String location;
   final GeoPoint? coordinates;
+}
+
+enum _CheckInTransactionOutcome {
+  boarded,
+  alreadyBoarded,
+  notFound,
+  wrongTrip,
+}
+
+sealed class ReservationCheckInResult {
+  const ReservationCheckInResult();
+}
+
+final class ReservationCheckInBoarded extends ReservationCheckInResult {
+  const ReservationCheckInBoarded(this.reservation);
+
+  final ReservationProfile reservation;
+}
+
+final class ReservationCheckInAlreadyBoarded extends ReservationCheckInResult {
+  const ReservationCheckInAlreadyBoarded();
+}
+
+final class ReservationCheckInNotFound extends ReservationCheckInResult {
+  const ReservationCheckInNotFound();
+}
+
+final class ReservationCheckInWrongTrip extends ReservationCheckInResult {
+  const ReservationCheckInWrongTrip();
 }

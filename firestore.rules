@@ -129,6 +129,27 @@ service cloud.firestore {
         && request.resource.data.status == resource.data.status;
     }
 
+    function isDriverBoardReservationUpdate() {
+      let trip = get(resource.data.trip_id);
+      let tripStatus = trip.data.status;
+      let hasCoordinates = 'pickup_coordinates' in resource.data
+        && resource.data.pickup_coordinates is latlng;
+
+      return isDriver()
+        && isTripDriver(trip.data)
+        && (tripStatus == 'Waiting-Passengers' || tripStatus == 'On-the-way')
+        && resource.data.status == 'waiting-boarding'
+        && request.resource.data.status == 'Boarded'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        && request.resource.data.trip_id == resource.data.trip_id
+        && request.resource.data.reservation_time == resource.data.reservation_time
+        && request.resource.data.phone_number == resource.data.phone_number
+        && request.resource.data.qr_data == resource.data.qr_data
+        && request.resource.data.pickup_location == resource.data.pickup_location
+        && (!hasCoordinates
+          || request.resource.data.pickup_coordinates == resource.data.pickup_coordinates);
+    }
+
     match /admins/{adminId} {
       allow read: if request.auth != null && request.auth.uid == adminId;
       allow write: if isAdmin();
@@ -180,7 +201,8 @@ service cloud.firestore {
     match /Reservation/{id} {
       allow read: if true;
       allow create: if isValidReservationCreate();
-      allow update, delete: if isAdmin();
+      allow update: if isAdmin() || isDriverBoardReservationUpdate();
+      allow delete: if isAdmin();
     }
 
     match /Payment/{id} {

@@ -427,10 +427,24 @@ class _DriverDashboardBodyState extends ConsumerState<_DriverDashboardBody> {
                 const Color(0xFFE8F5E9),
                 const Color(0xFF4CAF50),
                 () {
+                  final activeTripId = trip?.id;
+                  if (activeTripId == null || activeTripId.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Create and start an active trip before scanning.',
+                        ),
+                      ),
+                    );
+                    return;
+                  }
+
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const DriverScannerPage(),
+                      builder: (context) => DriverScannerPage(
+                        activeTripId: activeTripId,
+                      ),
                     ),
                   );
                 },

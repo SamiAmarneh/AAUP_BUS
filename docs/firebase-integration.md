@@ -269,7 +269,21 @@ Student booking records. Document ID is used in `qr_data` for driver scanner che
 
 **Fetching reservations:** My Tickets loads docs by **stored reservation IDs** (individual `get` per ID, batched in groups of 10 for loop organization). Each reservation is joined with its trip, bus, route, and payment. `fetchActiveReservationsByIds` keeps only tickets whose linked trip is still `Waiting-Passengers` or `On-the-way`. Pickup fields are surfaced on confirmation and ticket detail screens.
 
-**Rules:** guest (unauthenticated) create with field validation via `isValidReservationCreate()` + `isValidReservationPickup()`; guest read; admin update/delete.
+**Driver check-in (`ReservationRepository.checkInReservation`):**
+
+- Triggered from [`DriverScannerPage`](lib/features/driver/presentation/pages/scanner_page.dart) when the driver scans a student QR code (requires an active trip on the dashboard).
+- Decodes `qr_data` via [`ReservationQrDataCodec`](lib/core/reservation/reservation_qr_data_codec.dart) to get the reservation ID.
+- Runs a Firestore **transaction** that sets `status` from `waiting-boarding` to `Boarded` when:
+  - The reservation exists and belongs to the driver’s active `trip_id`
+  - The reservation is still `waiting-boarding`
+- Outcomes:
+  - **`waiting-boarding`** → updated to **`Boarded`**; success dialog; passenger list on dashboard updates via `driverTripPassengersProvider`
+  - **`Boarded`** → warning: not a valid reservation (already checked in)
+  - **Wrong trip** → warning when reservation belongs to a different trip
+  - **Missing / invalid QR** → invalid QR dialog
+- Local scan history in SharedPreferences is kept for export only; Firestore status is the source of truth.
+
+**Rules:** guest (unauthenticated) create with field validation via `isValidReservationCreate()` + `isValidReservationPickup()`; guest read; driver update via `isDriverBoardReservationUpdate()` (`waiting-boarding` → `Boarded` only, for their trip); admin update/delete.
 
 ---
 
@@ -368,7 +382,7 @@ Trip history falls back to client-side sorting if the composite index is missing
 | Live GPS publishing during active trip | Yes — writes to `bus_location` |
 | Booking push notifications | Yes — FCM via Cloud Function on `Reservation` create; token synced on driver login |
 | Passenger list + pickup locations | Yes — driver dashboard streams `Reservation` by active `trip_id` |
-| QR scanner (student check-in) | No — scanned data kept in memory / local export only |
+| QR scanner (student check-in) | Yes — updates `Reservation.status` to `Boarded` via `checkInReservation`; rejects already-boarded and wrong-trip tickets |
 
 ### Student
 
@@ -700,10 +714,9 @@ If the driver has no `fcm_token`, the function logs and skips send; the dashboar
 ## What is not connected yet (gaps)
 
 1. **Real payment gateway** — student checkout uses a fake/demo payment page; no PayPal/Apple Pay backend.
-2. **Driver scanner → Firestore** — driver QR scan does not yet update `Reservation.status` to `Boarded`.
-3. **Non-Android platforms** — Firebase not initialized on iOS/web/desktop in current code; FCM is Android-only in this codebase.
-4. **Firebase Storage, Analytics** — not used.
-5. **Student/admin push notifications** — not implemented.
+2. **Non-Android platforms** — Firebase not initialized on iOS/web/desktop in current code; FCM is Android-only in this codebase.
+3. **Firebase Storage, Analytics** — not used.
+4. **Student/admin push notifications** — not implemented.
 
 ---
 
@@ -727,7 +740,7 @@ If the driver has no `fcm_token`, the function logs and skips send; the dashboar
 |------|------|
 | `firebase.json` | Firestore rules, indexes, and Cloud Functions config |
 | `functions/src/index.ts` | `notifyDriverOnBooking` — FCM on reservation create |
-| `firestore.rules` | Security rules including guest booking and driver FCM token update (`isDriverFcmTokenUpdate`) |
+| `firestore.rules` | Security rules including guest booking, driver FCM token update (`isDriverFcmTokenUpdate`), and driver reservation check-in (`isDriverBoardReservationUpdate`) |
 | `firestore.indexes.json` | Composite indexes |
 | `.firebaserc` | Project alias |
 | `android/app/google-services.json` | Android Firebase app config |
@@ -740,7 +753,7 @@ If the driver has no `fcm_token`, the function logs and skips send; the dashboar
 | `lib/features/trips/domain/trip_details.dart` | Joined trip + route + bus model; `hasAvailableSeats` |
 | `lib/features/trips/data/trip_repository.dart` | Trip queries; browse list sorted by `created_at` desc; full-bus filter |
 | `lib/features/student/domain/models/trip_model.dart` | UI `Trip` adapter from `TripDetails` (seat counts for cards) |
-| `lib/features/student/data/reservation_repository.dart` | Booking transaction; conditional pickup resolution + reservation/payment joins |
+| `lib/features/student/data/reservation_repository.dart` | Booking transaction; conditional pickup resolution; reservation/payment joins; driver `checkInReservation` |
 | `lib/features/student/presentation/pages/pickup_location_page.dart` | On-the-way pickup text + optional GPS before payment |
 | `lib/features/student/presentation/pages/phone_entry_page.dart` | Phone entry; branches to pickup or payment by trip status |
 | `lib/features/student/data/student_reservation_providers.dart` | `activeTicketsProvider`, `refreshActiveTickets()` |

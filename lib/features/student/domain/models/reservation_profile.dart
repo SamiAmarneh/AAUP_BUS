@@ -25,6 +25,8 @@ class ReservationProfile {
 
   bool get isWaitingBoarding => status == ReservationStatus.waitingBoarding;
 
+  bool get isBoarded => status == ReservationStatus.boarded;
+
   factory ReservationProfile.fromFirestore({
     required String id,
     required Map<String, dynamic> data,

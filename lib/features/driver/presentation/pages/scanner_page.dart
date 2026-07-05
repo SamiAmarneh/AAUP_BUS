@@ -1,10 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../../../core/auth/auth_exceptions.dart';
 import '../../../../core/reservation/reservation_qr_data_codec.dart';
+import '../../../student/data/reservation_providers.dart';
+import '../../../student/data/reservation_repository.dart';
 
 /// Model to hold parsed QR data for a scanned student
 class ScannedStudent {
@@ -21,17 +27,20 @@ class ScannedStudent {
   });
 }
 
-class DriverScannerPage extends StatefulWidget {
-  const DriverScannerPage({super.key});
+class DriverScannerPage extends ConsumerStatefulWidget {
+  const DriverScannerPage({super.key, required this.activeTripId});
+
+  final String activeTripId;
 
   @override
-  State<DriverScannerPage> createState() => _DriverScannerPageState();
+  ConsumerState<DriverScannerPage> createState() => _DriverScannerPageState();
 }
 
-class _DriverScannerPageState extends State<DriverScannerPage>
+class _DriverScannerPageState extends ConsumerState<DriverScannerPage>
     with SingleTickerProviderStateMixin {
   MobileScannerController cameraController = MobileScannerController();
   bool isScanCompleted = false;
+  bool _isProcessingScan = false;
   final List<ScannedStudent> _scannedStudents = [];
   late AnimationController _animationController;
   late Animation<double> _scanLineAnimation;
@@ -192,7 +201,7 @@ class _DriverScannerPageState extends State<DriverScannerPage>
   }
 
   void _onDetect(BarcodeCapture capture) {
-    if (isScanCompleted) {
+    if (isScanCompleted || _isProcessingScan) {
       return;
     }
 
@@ -215,13 +224,51 @@ class _DriverScannerPageState extends State<DriverScannerPage>
       return;
     }
 
-    if (_scannedStudents.any((student) => student.codeId == payload.id)) {
-      _showDuplicateDialog(payload.id);
-      return;
-    }
+    unawaited(_processCheckIn(payload));
+  }
 
-    setState(() => isScanCompleted = true);
-    _showSuccessDialog(payload);
+  Future<void> _processCheckIn(ReservationQrPayload payload) async {
+    setState(() {
+      _isProcessingScan = true;
+      isScanCompleted = true;
+    });
+
+    try {
+      final repository = ref.read(reservationRepositoryProvider);
+      final result = await repository.checkInReservation(
+        reservationId: payload.id,
+        activeTripId: widget.activeTripId,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      switch (result) {
+        case ReservationCheckInBoarded():
+          _showSuccessDialog(payload);
+        case ReservationCheckInAlreadyBoarded():
+          _showAlreadyBoardedDialog();
+        case ReservationCheckInNotFound():
+          _showInvalidQrDialog();
+        case ReservationCheckInWrongTrip():
+          _showWrongTripDialog();
+      }
+    } on AuthFailure catch (failure) {
+      if (!mounted) {
+        return;
+      }
+      _showCheckInErrorDialog(failure.message);
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      _showCheckInErrorDialog('Something went wrong. Please try again.');
+    } finally {
+      if (mounted) {
+        setState(() => _isProcessingScan = false);
+      }
+    }
   }
 
   void _showInvalidQrDialog() {
@@ -303,8 +350,86 @@ class _DriverScannerPageState extends State<DriverScannerPage>
     );
   }
 
-  void _showDuplicateDialog(String codeId) {
-    setState(() => isScanCompleted = true);
+  void _showAlreadyBoardedDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: Colors.white,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFEBEE),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.red.withOpacity(0.2),
+                    blurRadius: 20,
+                    spreadRadius: 5,
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.error_outline,
+                color: Colors.red,
+                size: 48,
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Invalid Reservation',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1A1C1E),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'This QR code is not a valid reservation.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+            ),
+          ],
+        ),
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                setState(() => isScanCompleted = false);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                elevation: 0,
+              ),
+              child: const Text(
+                'Try Again',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  void _showWrongTripDialog() {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -336,7 +461,7 @@ class _DriverScannerPageState extends State<DriverScannerPage>
             ),
             const SizedBox(height: 20),
             const Text(
-              'Already Scanned!',
+              'Wrong Trip',
               style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
@@ -345,25 +470,9 @@ class _DriverScannerPageState extends State<DriverScannerPage>
             ),
             const SizedBox(height: 10),
             Text(
-              'This student QR code has already been scanned for this trip.',
+              'This reservation is not for your active trip.',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                codeId,
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontFamily: 'monospace',
-                  color: Colors.blueGrey,
-                ),
-              ),
             ),
           ],
         ),
@@ -378,6 +487,78 @@ class _DriverScannerPageState extends State<DriverScannerPage>
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.orange,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                elevation: 0,
+              ),
+              child: const Text(
+                'Try Again',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  void _showCheckInErrorDialog(String message) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: Colors.white,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFEBEE),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.error_outline,
+                color: Colors.red,
+                size: 48,
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Check-in Failed',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1A1C1E),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+            ),
+          ],
+        ),
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                setState(() => isScanCompleted = false);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
@@ -948,6 +1129,24 @@ class _DriverScannerPageState extends State<DriverScannerPage>
 
           // Dark overlay with cutout
           _buildScanOverlay(),
+
+          if (_isProcessingScan)
+            Container(
+              color: Colors.black54,
+              child: const Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(color: Color(0xFF4CAF50)),
+                    SizedBox(height: 16),
+                    Text(
+                      'Verifying reservation...',
+                      style: TextStyle(color: Colors.white, fontSize: 16),
+                    ),
+                  ],
+                ),
+              ),
+            ),
 
           // Top bar
           Positioned(
