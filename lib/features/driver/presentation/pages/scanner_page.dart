@@ -18,12 +18,14 @@ class ScannedStudent {
   final String tripName;
   final String busId;
   final DateTime scannedAt;
+  final String phoneNumber;
 
   ScannedStudent({
     required this.codeId,
     required this.tripName,
     required this.busId,
     required this.scannedAt,
+    this.phoneNumber = '',
   });
 }
 
@@ -86,13 +88,14 @@ class _DriverScannerPageState extends ConsumerState<DriverScannerPage>
         _scannedStudents.clear();
         for (String data in savedData) {
           final parts = data.split('|');
-          if (parts.length == 4) {
+          if (parts.length >= 4) {
             _scannedStudents.add(
               ScannedStudent(
                 codeId: parts[0],
                 tripName: parts[1],
                 busId: parts[2],
                 scannedAt: DateTime.parse(parts[3]),
+                phoneNumber: parts.length >= 5 ? parts[4] : '',
               ),
             );
           }
@@ -107,7 +110,7 @@ class _DriverScannerPageState extends ConsumerState<DriverScannerPage>
     final List<String> data = _scannedStudents
         .map(
           (student) =>
-              '${student.codeId}|${student.tripName}|${student.busId}|${student.scannedAt.toIso8601String()}',
+              '${student.codeId}|${student.tripName}|${student.busId}|${student.scannedAt.toIso8601String()}|${student.phoneNumber}',
         )
         .toList();
     await _prefs!.setStringList('scanned_students', data);
@@ -143,8 +146,11 @@ class _DriverScannerPageState extends ConsumerState<DriverScannerPage>
       report.writeln('');
 
       for (var student in tripEntry.value) {
+        final label = student.phoneNumber.isNotEmpty
+            ? student.phoneNumber
+            : student.codeId;
         report.writeln(
-          '- ${student.codeId} (${TimeOfDay.fromDateTime(student.scannedAt).format(context)})',
+          '- $label (${TimeOfDay.fromDateTime(student.scannedAt).format(context)})',
         );
       }
       report.writeln('');
@@ -245,8 +251,11 @@ class _DriverScannerPageState extends ConsumerState<DriverScannerPage>
       }
 
       switch (result) {
-        case ReservationCheckInBoarded():
-          _showSuccessDialog(payload);
+        case ReservationCheckInBoarded(:final reservation):
+          _showSuccessDialog(
+            payload: payload,
+            phoneNumber: reservation.phoneNumber,
+          );
         case ReservationCheckInAlreadyBoarded():
           _showAlreadyBoardedDialog();
         case ReservationCheckInNotFound():
@@ -580,7 +589,10 @@ class _DriverScannerPageState extends ConsumerState<DriverScannerPage>
     );
   }
 
-  void _showSuccessDialog(ReservationQrPayload payload) {
+  void _showSuccessDialog({
+    required ReservationQrPayload payload,
+    required String phoneNumber,
+  }) {
     final codeId = payload.id;
     final tripName = payload.trip;
     final busId = payload.bus;
@@ -705,6 +717,7 @@ class _DriverScannerPageState extends ConsumerState<DriverScannerPage>
                       tripName: tripName,
                       busId: busId,
                       scannedAt: DateTime.now(),
+                      phoneNumber: phoneNumber,
                     ),
                   );
                   isScanCompleted = false;
@@ -747,6 +760,7 @@ class _DriverScannerPageState extends ConsumerState<DriverScannerPage>
                       tripName: tripName,
                       busId: busId,
                       scannedAt: DateTime.now(),
+                      phoneNumber: phoneNumber,
                     ),
                   );
                 });
@@ -1037,15 +1051,26 @@ class _DriverScannerPageState extends ConsumerState<DriverScannerPage>
                                           fontSize: 15,
                                         ),
                                       ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        student.codeId,
-                                        style: TextStyle(
-                                          color: Colors.grey[500],
-                                          fontSize: 12,
-                                          fontFamily: 'monospace',
+                                      if (student.phoneNumber.isNotEmpty) ...[
+                                        const SizedBox(height: 4),
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              Icons.phone,
+                                              size: 12,
+                                              color: Colors.grey[500],
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              student.phoneNumber,
+                                              style: TextStyle(
+                                                color: Colors.grey[600],
+                                                fontSize: 13,
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                      ),
+                                      ],
                                     ],
                                   ),
                                 ),
